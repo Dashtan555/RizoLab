@@ -1,0 +1,22 @@
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*~
+
+# Respaldos y temporales
+*_backup.html
+*_BACKUP.html
+*_ESTABLE*.html
+*_AZUL*.html
+*.bak
+*.tmp
+
+# Perfiles de usuario exportados (no forman parte del código)
+*.gcode
+perfil_rizolab*.json

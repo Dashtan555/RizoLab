@@ -1,0 +1,2405 @@
+<!DOCTYPE html>
+<!--
+  RizoLab — generador paramétrico de G-code para impresión 3D en modo jarrón.
+  Copyright (C) 2026 Darwin (RizoLab 3D).
+
+  Este programa es software libre: puedes redistribuirlo y/o modificarlo
+  bajo los términos de la Licencia Pública General GNU (GPL) versión 3,
+  publicada por la Free Software Foundation.
+
+  Se distribuye con la esperanza de que sea útil, pero SIN NINGUNA GARANTÍA.
+  Consulta la Licencia Pública General GNU para más detalles: https://www.gnu.org/licenses/gpl-3.0.html
+-->
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RizoLab — Diseñador de trayectorias en espiral</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ===== estilo dashboard profesional ===== */
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#eceef1; --sheet:#f4f5f7; --card:#ffffff;
+    --line:#e4e7ec; --hair:#eef0f3;
+    --ink:#1a2233; --muted:#8a93a2;
+    --accent:#1c5d66; --accent-2:#154249; --accent-soft:#e8f0f1;
+    --donate:#e8567d; --donate-2:#d63e69; --donate-glow:rgba(232,86,125,.35); --donate-glow-strong:rgba(232,86,125,.55);
+    --grid1:0xd6d3cc; --grid2:0xe3e1da;
+    --radius:14px; --radius-sm:9px;
+    --shadow:0 1px 2px rgba(20,30,50,.04), 0 4px 16px rgba(20,30,50,.05);
+    --shadow-sm:0 1px 2px rgba(20,30,50,.05);
+    --mono:ui-monospace,'Cascadia Code','JetBrains Mono',Menlo,Consolas,monospace;
+    --sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  body.dark{
+    --bg:#12141a; --sheet:#171a21; --card:#1d212a;
+    --line:#2b303a; --hair:#242932;
+    --ink:#e7eaf0; --muted:#828b9b;
+    --accent:#4db3c0; --accent-2:#6cc7d2; --accent-soft:#152a2e;
+    --donate:#f06a90; --donate-2:#e8567d; --donate-glow:rgba(240,106,144,.4); --donate-glow-strong:rgba(240,106,144,.6);
+    --shadow:0 1px 2px rgba(0,0,0,.2), 0 4px 16px rgba(0,0,0,.25);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.2);
+  }
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--ink);
+    font:13.5px/1.5 var(--sans);
+    display:flex;flex-direction:column;overflow:hidden;-webkit-font-smoothing:antialiased}
+  /* ---- cabecera ---- */
+  header{display:flex;align-items:center;gap:14px;padding:12px 20px;
+    background:var(--card);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  header h1{font-size:18px;font-weight:800;letter-spacing:.5px}
+  header h1 span{color:var(--accent)}
+  header h1 small{font-weight:500;color:var(--muted);font-size:11px;letter-spacing:.5px;margin-left:7px;
+    background:var(--sheet);padding:2px 7px;border-radius:20px}
+  .machine{font-size:11px;letter-spacing:.2px;color:var(--muted);
+    border:1px solid var(--line);padding:6px 12px;border-radius:20px;background:var(--sheet)}
+  .issued{font-size:10px;letter-spacing:1px;color:var(--accent);font-weight:700;
+    text-transform:uppercase;border:1px solid var(--accent-soft);background:var(--accent-soft);
+    padding:6px 12px;border-radius:20px}
+  header .spacer{flex:1}
+  .sheet{font-weight:700;font-size:15px;color:var(--muted);letter-spacing:.5px}
+  #btnReset{background:var(--card);color:var(--ink);border:1px solid var(--line);
+    padding:8px 15px;font-family:var(--sans);font-weight:600;font-size:12px;
+    letter-spacing:.3px;cursor:pointer;border-radius:20px;box-shadow:var(--shadow-sm)}
+  #btnReset:hover{border-color:var(--accent);color:var(--accent)}
+  /* ---- layout de 3 zonas ---- */
+  #layout{flex:1;display:flex;flex-direction:column;min-height:0}
+  #stage{flex:1;display:flex;min-height:0;gap:14px;padding:14px}
+  .side{width:340px;min-width:340px;overflow-y:auto;padding:2px 4px 40px}
+  .side::-webkit-scrollbar{width:8px}
+  .side::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+  .side .modeTabs{margin-bottom:14px}
+  #btnTheme{background:var(--card);color:var(--ink);border:1px solid var(--line);
+    padding:8px 12px;font-size:14px;cursor:pointer;line-height:1;border-radius:20px;box-shadow:var(--shadow-sm)}
+  #btnTheme:hover{border-color:var(--accent);color:var(--accent)}
+  /* casilla numérica junto al slider */
+  .ctl .rowline{display:flex;align-items:center;gap:8px}
+  .ctl .rowline input[type=range]{flex:1}
+  .ctl .num{width:64px;background:var(--sheet);color:var(--ink);border:1px solid var(--line);
+    padding:6px 7px;font-family:var(--mono);font-size:11.5px;text-align:right;border-radius:8px}
+  .ctl .num:focus{border-color:var(--accent);outline:none;background:var(--card)}
+  @media (max-width:1100px){
+    #stage{flex-direction:column}
+    .side{width:100%;min-width:0;max-height:44vh}
+    .sideR{order:3}
+    #viewerWrap{min-height:340px;order:2}
+  }
+  .modeTabs{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .modeTabs button{border:1px solid var(--line);background:var(--card);color:var(--muted);
+    padding:10px 8px;font-family:var(--sans);font-weight:600;font-size:11px;
+    letter-spacing:.2px;cursor:pointer;border-radius:var(--radius-sm);box-shadow:var(--shadow-sm);transition:all .12s}
+  .modeTabs button:hover{border-color:var(--accent);color:var(--accent)}
+  .modeTabs button.on{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(28,93,102,.25)}
+  /* ---- tarjetas (secciones) ---- */
+  details{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:4px 16px;margin-bottom:12px;box-shadow:var(--shadow)}
+  details>summary{cursor:pointer;list-style:none;font-family:var(--sans);font-weight:700;
+    font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink);
+    display:flex;align-items:center;gap:8px;user-select:none;padding:12px 0}
+  details>summary::before{content:'▸';color:var(--accent);transition:transform .15s;font-size:10px}
+  details[open]>summary::before{transform:rotate(90deg)}
+  details[open]>summary{border-bottom:1px solid var(--hair);margin-bottom:6px;padding-bottom:11px}
+  .ctl{margin:12px 0 4px}
+  .ctl label{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+  .ctl label b{font-weight:600;font-size:12.5px;color:var(--ink)}
+  .ctl label output{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:700;
+    background:var(--accent-soft);padding:1px 8px;border-radius:20px}
+  .ctl input[type=range]{width:100%;accent-color:var(--accent);height:20px}
+  .ctl small{color:var(--muted);font-size:11px;display:block;margin-top:3px;line-height:1.4}
+  .sub{font-family:var(--sans);font-size:10px;letter-spacing:1.2px;text-transform:uppercase;
+    color:var(--muted);font-weight:700;border-top:1px solid var(--hair);margin:16px 0 2px;padding-top:12px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  select,textarea,input[type=number]{width:100%;background:var(--sheet);color:var(--ink);
+    border:1px solid var(--line);padding:8px 10px;font-family:var(--mono);font-size:12px;border-radius:8px}
+  select:focus,textarea:focus{border-color:var(--accent);outline:none;background:var(--card)}
+  textarea{min-height:110px;resize:vertical;white-space:pre}
+  .btns{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .btns button{border:1px solid var(--line);padding:11px 16px;font-family:var(--sans);
+    font-weight:700;font-size:12px;letter-spacing:.3px;cursor:pointer;border-radius:var(--radius-sm);
+    box-shadow:var(--shadow-sm);transition:all .12s}
+  #btnGcode{background:var(--accent);border-color:var(--accent);color:#fff;flex:1;
+    box-shadow:0 2px 10px rgba(28,93,102,.25)}
+  #btnGcode:hover{background:var(--accent-2)}
+  .ghost{background:var(--card);color:var(--ink)}
+  .ghost:hover{border-color:var(--accent);color:var(--accent)}
+  /* ---- editor de perfil ---- */
+  #profWrap{margin-top:10px}
+  #profCanvas{width:100%;height:200px;background:var(--sheet);
+    border:1px solid var(--line);border-radius:var(--radius-sm);touch-action:none;cursor:crosshair;display:block}
+  .profBtns{display:flex;gap:6px;margin-top:8px}
+  .profBtns button{flex:1;background:var(--sheet);border:1px solid var(--line);
+    color:var(--muted);padding:7px 4px;font-family:var(--sans);font-size:10.5px;
+    font-weight:600;letter-spacing:.2px;text-transform:uppercase;cursor:pointer;border-radius:8px}
+  .profBtns button:hover{color:var(--accent);border-color:var(--accent)}
+  /* ---- visor ---- */
+  #viewerWrap{flex:1;position:relative;min-width:0;border-radius:var(--radius);overflow:hidden;
+    background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow)}
+  #viewer{position:absolute;inset:0;cursor:grab}
+  #viewer:active{cursor:grabbing}
+  #stats{position:absolute;top:14px;right:14px;background:var(--card);
+    border:1px solid var(--line);border-radius:var(--radius-sm);padding:11px 15px;font-family:var(--mono);font-size:11.5px;
+    line-height:1.8;pointer-events:none;box-shadow:var(--shadow)}
+  #stats b{color:var(--accent)}
+  #warn{position:absolute;top:56px;left:50%;transform:translateX(-50%);display:none;
+    background:var(--card);border:1px solid var(--accent);color:var(--accent);
+    padding:8px 14px;font-size:11.5px;border-radius:20px;box-shadow:var(--shadow)}
+  #simBar{position:absolute;left:16px;right:16px;bottom:16px;display:flex;align-items:center;
+    gap:12px;background:var(--card);border:1px solid var(--line);padding:10px 16px;border-radius:var(--radius-sm);box-shadow:var(--shadow)}
+  #simBar label{font-family:var(--sans);font-size:10.5px;letter-spacing:.8px;font-weight:600;
+    text-transform:uppercase;color:var(--muted);white-space:nowrap}
+  #sim{flex:1;accent-color:var(--accent)}
+  #simVal{font-family:var(--mono);font-size:12px;min-width:44px;text-align:right;
+    color:var(--accent);font-weight:700}
+  .legend{position:absolute;bottom:70px;left:16px;font-family:var(--sans);font-size:10.5px;
+    color:var(--muted);background:var(--card);border:1px solid var(--line);padding:9px 13px;line-height:1.9;
+    border-radius:var(--radius-sm);box-shadow:var(--shadow)}
+  .dot{display:inline-block;width:9px;height:9px;margin-right:6px;vertical-align:middle;border-radius:2px}
+  /* ---- botones de cabecera extra ---- */
+  #btnHelp,#btnDonate{background:var(--card);color:var(--ink);border:1px solid var(--line);
+    padding:8px 13px;font-family:var(--sans);font-weight:600;font-size:12px;letter-spacing:.2px;
+    cursor:pointer;border-radius:20px;box-shadow:var(--shadow-sm);white-space:nowrap}
+  #btnHelp:hover{border-color:var(--accent);color:var(--accent)}
+  #btnDonate{background:var(--donate);border-color:transparent;color:#fff;font-weight:700;
+    position:relative;box-shadow:0 2px 10px var(--donate-glow);
+    animation:donatePulse 2.8s ease-in-out infinite}
+  #btnDonate:hover{background:var(--donate-2);animation-play-state:paused;
+    box-shadow:0 4px 16px var(--donate-glow)}
+  @keyframes donatePulse{
+    0%,100%{box-shadow:0 2px 8px var(--donate-glow)}
+    50%{box-shadow:0 2px 18px var(--donate-glow-strong)}
+  }
+  #btnDonate .heart{display:inline-block;animation:heartBeat 2.8s ease-in-out infinite}
+  @keyframes heartBeat{
+    0%,100%{transform:scale(1)}
+    12%{transform:scale(1.25)}
+    24%{transform:scale(1)}
+    36%{transform:scale(1.15)}
+    48%{transform:scale(1)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #btnDonate,#btnDonate .heart{animation:none}
+  }
+  /* ---- overlays / modales ---- */
+  .overlay{position:fixed;inset:0;background:rgba(15,22,35,.55);backdrop-filter:blur(3px);
+    display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .overlay.show{display:flex}
+  .modal{background:var(--card);border:1px solid var(--line);border-radius:18px;
+    max-width:560px;width:100%;box-shadow:0 20px 60px rgba(15,22,35,.3);
+    display:flex;flex-direction:column;max-height:88vh;overflow:hidden}
+  .modalHead{display:flex;justify-content:space-between;align-items:flex-start;
+    padding:22px 24px 14px;gap:16px}
+  .modalKicker{font-size:10.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
+    color:var(--accent);margin-bottom:5px}
+  .modalHead h2{font-size:21px;font-weight:800;letter-spacing:-.2px}
+  .modalX{background:var(--sheet);border:1px solid var(--line);color:var(--muted);
+    width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:14px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center}
+  .modalX:hover{color:var(--accent);border-color:var(--accent)}
+  .modalBody{padding:4px 24px 8px;overflow-y:auto;font-size:14px;line-height:1.6}
+  .modalBody .step-visual{background:var(--sheet);border:1px solid var(--line);border-radius:12px;
+    padding:16px;margin-bottom:16px;display:flex;align-items:center;gap:14px}
+  .modalBody .step-ico{font-size:30px;flex-shrink:0;width:52px;height:52px;border-radius:12px;
+    background:var(--accent-soft);display:flex;align-items:center;justify-content:center}
+  .modalBody .step-visual div b{display:block;font-size:14px;margin-bottom:2px}
+  .modalBody .step-visual div span{font-size:12.5px;color:var(--muted);line-height:1.5}
+  .modalBody ul{margin:10px 0 4px;padding-left:2px;list-style:none}
+  .modalBody ul li{position:relative;padding-left:22px;margin-bottom:9px;font-size:13.5px;line-height:1.5}
+  .modalBody ul li::before{content:'→';position:absolute;left:0;color:var(--accent);font-weight:700}
+  .modalFoot{display:flex;justify-content:space-between;align-items:center;
+    padding:16px 24px 20px;border-top:1px solid var(--hair);gap:12px}
+  .dots{display:flex;gap:7px}
+  .dots span{width:8px;height:8px;border-radius:50%;background:var(--line);transition:all .2s}
+  .dots span.on{background:var(--accent);width:22px;border-radius:5px}
+  .modalBtns{display:flex;gap:8px}
+  .ghost2{background:var(--card);color:var(--ink);border:1px solid var(--line);
+    padding:9px 16px;font-family:var(--sans);font-weight:600;font-size:13px;cursor:pointer;border-radius:9px}
+  .ghost2:hover{border-color:var(--accent);color:var(--accent)}
+  .primary2{background:var(--accent);color:#fff;border:1px solid var(--accent);
+    padding:9px 20px;font-family:var(--sans);font-weight:700;font-size:13px;cursor:pointer;border-radius:9px}
+  .primary2:hover{background:var(--accent-2)}
+  .donateBtn{display:block;text-align:center;background:var(--accent);color:#fff;
+    text-decoration:none;padding:14px;border-radius:11px;font-weight:700;font-size:15px;
+    box-shadow:0 4px 14px rgba(28,93,102,.3)}
+  .donateBtn:hover{background:var(--accent-2)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Rizo<span>Lab</span><small>v2</small></h1>
+  <span class="machine" id="machineLabel">Perfil de máquina · Volumen 300 × 300 × 400 mm</span>
+  <span class="issued">Issued for printing</span>
+  <div class="spacer"></div>
+  <span class="sheet">A2.1</span>
+  <button id="btnHelp" title="Cómo funciona">? Ayuda</button>
+  <button id="btnDonate" title="Apoya el proyecto"><span class="heart">♥</span> Donar</button>
+  <button id="btnTheme" title="Modo oscuro / claro">◐</button>
+  <button id="btnReset">↺ Reset</button>
+</header>
+
+<!-- ===== Tutorial de bienvenida ===== -->
+<div id="tourOverlay" class="overlay">
+  <div class="modal">
+    <div class="modalHead">
+      <div>
+        <div class="modalKicker" id="tourKicker">Bienvenido</div>
+        <h2 id="tourTitle">Qué es RizoLab</h2>
+      </div>
+      <button class="modalX" id="tourClose" title="Cerrar">✕</button>
+    </div>
+    <div class="modalBody" id="tourBody"></div>
+    <div class="modalFoot">
+      <div class="dots" id="tourDots"></div>
+      <div class="modalBtns">
+        <button class="ghost2" id="tourSkip">Saltar</button>
+        <button class="ghost2" id="tourPrev">Anterior</button>
+        <button class="primary2" id="tourNext">Siguiente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Modal de donación ===== -->
+<div id="donateOverlay" class="overlay">
+  <div class="modal" style="max-width:420px">
+    <div class="modalHead">
+      <div>
+        <div class="modalKicker">Apoya el proyecto</div>
+        <h2>RizoLab es gratis</h2>
+      </div>
+      <button class="modalX" id="donateClose" title="Cerrar">✕</button>
+    </div>
+    <div class="modalBody">
+      <p style="margin-bottom:14px">RizoLab es una herramienta libre, sin anuncios ni límites. Si te resulta útil y quieres apoyar su desarrollo, cualquier aporte voluntario ayuda a mantenerla y mejorarla.</p>
+      <p style="color:var(--muted);font-size:12px;margin-bottom:16px">Gracias por ser parte de esto. Cada aporte, por pequeño que sea, hace la diferencia.</p>
+      <a id="donateLink" href="#" target="_blank" rel="noopener" class="donateBtn">♥ Hacer una donación</a>
+      <p style="color:var(--muted);font-size:11px;margin-top:12px;text-align:center">Se abrirá en una pestaña nueva.</p>
+    </div>
+  </div>
+</div>
+
+<div id="layout">
+  <div id="stage">
+    <aside class="side sideL">
+
+<details open>
+      <summary>01 · Perfil (silueta)</summary>
+      <div id="profWrap">
+        <canvas id="profCanvas"></canvas>
+        <div class="profBtns">
+          <button data-prof="cyl">Cilindro</button>
+          <button data-prof="vase">Jarrón</button>
+          <button data-prof="cone">Cono</button>
+          <button data-prof="hour">Diábolo</button>
+        </div>
+        <div class="profBtns" style="margin-top:6px">
+          <button id="btnDraw">✎ Dibujar</button>
+          <button id="btnAddPt">+ Punto</button>
+          <button id="btnDelPt">− Punto</button>
+        </div>
+        <div class="ctl"><label><b>Suavizado</b><output id="o_psm"></output></label>
+          <input type="range" id="psm" min="0" max="12" step="1" value="2"></div>
+        <small id="profHint" style="color:var(--muted);font-size:11px;display:block;margin-top:2px">
+          Arrastra los puntos · doble clic añade · clic derecho elimina · <b id="profN"></b> puntos.
+        </small>
+      </div>
+      <div class="row2">
+        <div class="ctl"><label><b>Diámetro máx.</b><output id="o_dia"></output></label>
+          <input type="range" id="dia" min="30" max="260" step="2" value="100"></div>
+        <div class="ctl"><label><b>Altura</b><output id="o_alt"></output></label>
+          <input type="range" id="alt" min="20" max="380" step="2" value="90"></div>
+      </div>
+      <div class="ctl"><label><b>Vueltas de base sólida</b><output id="o_baseL"></output></label>
+        <input type="range" id="baseL" min="0" max="25" step="1" value="8"></div>
+    </details>
+<details open>
+      <summary>02 · Adherencia a la cama</summary>
+      <div class="ctl"><label><b>Falda / brim</b>
+        <input type="checkbox" id="brimOn" checked style="accent-color:var(--accent);width:16px;height:16px"></label>
+        <small>Anillos alrededor de la base para anclar y purgar.</small></div>
+      <div id="brimCtls">
+        <div class="ctl"><label><b>Vueltas de falda</b><output id="o_brim"></output></label>
+          <input type="range" id="brim" min="1" max="15" step="1" value="6"></div>
+        <div class="ctl"><label><b>Separación del diseño</b><output id="o_brimSep"></output></label>
+          <input type="range" id="brimSep" min="0" max="10" step="0.5" value="0">
+          <small>0 = pegada a la pared (brim, máxima adherencia) · &gt;0 = falda separada a esa distancia (solo purga).</small></div>
+      </div>
+      <div class="ctl"><label><b>Paredes de la base</b><output id="o_walls"></output></label>
+        <input type="range" id="walls" min="1" max="4" step="1" value="2">
+        <small>Perímetros concéntricos en las vueltas de base: anillo rígido que resiste los tirones de los rizos.</small></div>
+      <div class="row2">
+        <div class="ctl"><label><b>1ª capa: altura</b><output id="o_flh"></output></label>
+          <input type="range" id="flh" min="0.2" max="0.4" step="0.02" value="0.3"></div>
+        <div class="ctl"><label><b>1ª capa: ancho</b><output id="o_flw"></output></label>
+          <input type="range" id="flw" min="0.4" max="1.2" step="0.05" value="0.8"></div>
+      </div>
+      <small style="color:var(--muted);font-size:11px;display:block;margin:2px 2px 4px">
+        Primera capa aplastada = mucho más agarre. El brim y la 1ª capa usan estos valores.
+      </small>
+      <div class="sub">Piso sólido (recipiente)</div>
+      <div class="ctl"><label><b>Cerrar el fondo</b>
+        <input type="checkbox" id="floorOn" style="accent-color:var(--accent);width:16px;height:16px"></label>
+        <small>Rellena la base en espiral para hacer recipientes estancos (vasos, macetas).</small></div>
+      <div id="floorCtls" style="display:none">
+        <div class="ctl"><label><b>Capas de piso</b><output id="o_floorL"></output></label>
+          <input type="range" id="floorL" min="1" max="8" step="1" value="3">
+          <small>Cuántas capas del fondo se rellenan. Más capas = fondo más estanco.</small></div>
+        <div class="ctl"><label><b>Apertura central</b><output id="o_floorHole"></output></label>
+          <input type="range" id="floorHole" min="0" max="80" step="1" value="0">
+          <small>0 = fondo cerrado · &gt;0 = agujero central de ese diámetro (macetas con drenaje, pantallas).</small></div>
+      </div>
+    </details>
+<details open>
+      <summary>03 · Sección transversal</summary>
+      <div class="ctl">
+        <select id="section">
+          <option value="circle">Círculo</option>
+          <option value="square">Cuadrado (superelipse)</option>
+          <option value="poly">Polígono</option>
+          <option value="star">Estrella</option>
+          <option value="superf">Superformula</option>
+        </select>
+      </div>
+      <div class="ctl" data-sec="square"><label><b>Redondez de esquinas</b><output id="o_sqn"></output></label>
+        <input type="range" id="sqn" min="2.5" max="14" step="0.5" value="6">
+        <small>Bajo = redondeado · alto = cuadrado marcado.</small></div>
+      <div class="ctl" data-sec="poly star superf"><label><b>Lados / lóbulos</b><output id="o_nl"></output></label>
+        <input type="range" id="nl" min="3" max="16" step="1" value="6"></div>
+      <div class="ctl" data-sec="star"><label><b>Profundidad de estrella</b><output id="o_st"></output></label>
+        <input type="range" id="st" min="0.05" max="0.5" step="0.01" value="0.2"></div>
+      <div class="ctl" data-sec="superf"><label><b>Superformula n1</b><output id="o_sf1"></output></label>
+        <input type="range" id="sf1" min="0.2" max="8" step="0.1" value="1"></div>
+      <div class="ctl" data-sec="superf"><label><b>Superformula n2=n3</b><output id="o_sf2"></output></label>
+        <input type="range" id="sf2" min="0.2" max="8" step="0.1" value="1.7">
+        <small>Combina lóbulos + exponentes: formas orgánicas intrincadas.</small></div>
+      <div class="ctl"><label><b>Twist global</b><output id="o_gtw"></output></label>
+        <input type="range" id="gtw" min="-360" max="360" step="5" value="0">
+        <small>Rotación de la sección a lo largo de la altura (grados).</small></div>
+    </details>
+<details open>
+      <summary>07 · Inspección</summary>
+      <div class="ctl"><label><b>Aislar pisos / capas</b>
+        <input type="checkbox" id="isoOn" style="accent-color:var(--accent);width:16px;height:16px"></label>
+        <small>Muestra solo un rango de pisos/capas para estudiar las espiras de cerca.</small></div>
+      <div id="isoCtls" style="display:none">
+        <div class="ctl"><label><b>Desde</b><output id="o_isoA"></output></label>
+          <input type="range" id="isoA" min="0" max="50" step="1" value="0"></div>
+        <div class="ctl"><label><b>Hasta</b><output id="o_isoB"></output></label>
+          <input type="range" id="isoB" min="0" max="50" step="1" value="2"></div>
+      </div>
+      <div class="btns" style="margin-top:8px">
+        <button id="btnFocus" class="ghost" style="flex:1">⌖ Enfocar</button>
+        <button id="btnCamReset" class="ghost" style="flex:1">⤢ Vista completa</button>
+      </div>
+      <div class="ctl" style="margin-top:10px"><label><b>Ver voladizos</b>
+        <input type="checkbox" id="ovOn" style="accent-color:var(--accent);width:16px;height:16px"></label>
+        <small>Colorea la trayectoria por inclinación: verde seguro · ámbar límite (&gt;<span id="ovLimTxt">50</span>°) · rojo crítico (&gt;65°).</small></div>
+      <div class="ctl" data-ov="1" style="display:none"><label><b>Umbral de aviso</b><output id="o_ovLim"></output></label>
+        <input type="range" id="ovLim" min="40" max="70" step="1" value="50"></div>
+      <small style="color:var(--muted);font-size:11px;display:block;margin-top:6px">
+        Rueda = zoom (hasta escala de hilo) · arrastre = rotar · Shift o botón derecho = desplazar · doble clic = enfocar.
+      </small>
+    </details>
+      
+    </aside>
+    <div id="viewerWrap">
+    <div id="viewer"></div>
+    <div id="warn">⚠ La pieza excede la cama de 300×300 — reduce el diámetro.</div>
+    <div class="legend">
+      <span class="dot" style="background:#6b6862"></span>Base sólida ·
+      <span class="dot" style="background:#1c5d66"></span>Patrón<br>
+      <span style="color:var(--muted)">arrastra = rotar · rueda = zoom</span>
+    </div>
+    <div id="stats"></div>
+    <div id="simBar">
+      <label>Simular</label>
+      <input type="range" id="sim" min="0" max="1000" value="1000">
+      <span id="simVal">100%</span>
+    </div>
+  </div>
+    <aside class="side sideR">
+
+    <div class="modeTabs">
+      <button id="modeBands" class="on">Bandas aéreas</button>
+      <button id="modeStitch">Puntadas</button>
+      <button id="modeColumns">Columnas</button>
+      <button id="modeWaves">Olas</button>
+      <button id="modeSurface" style="grid-column:1/-1">Superficie · Patrones</button>
+    </div>
+
+<details open>
+      <summary id="patTitle">04 · Patrón</summary>
+      <!-- rejilla de patrones de superficie -->
+      <div class="ctl" data-mode="surface" id="patSelWrap" style="display:none">
+        <label><b>Patrón de superficie</b></label>
+        <select id="patternSel"></select>
+      </div>
+      <div class="ctl" data-mode="surface"><label><b>Repetición vertical</b><output id="o_rep"></output></label>
+        <input type="range" id="rep" min="0.5" max="12" step="0.5" value="4"></div>
+      <div class="ctl" data-mode="surface"><label><b>Frecuencia secundaria</b><output id="o_fk"></output></label>
+        <input type="range" id="fk" min="1" max="16" step="1" value="6"></div>
+      <div class="ctl" data-mode="surface" data-pat="scales"><label><b>Punta de escama</b><output id="o_pointy"></output></label>
+        <input type="range" id="pointy" min="0.4" max="4" step="0.1" value="1.6">
+        <small>Exponente de la celda: bajo = redondo · alto = gota puntiaguda.</small></div>
+      <!-- comunes -->
+      <div class="ctl"><label><b id="lblK">Rizos por vuelta</b><output id="o_k"></output></label>
+        <input type="range" id="k" min="6" max="120" step="1" value="34"></div>
+      <div class="ctl"><label><b id="lblAmp">Amplitud / profundidad</b><output id="o_amp"></output></label>
+        <input type="range" id="amp" min="0.5" max="30" step="0.5" value="9"></div>
+      <div class="ctl" data-mode="bands stitch columns"><label><b>Rizado (loopiness q)</b><output id="o_q"></output></label>
+        <input type="range" id="q" min="0" max="2" step="0.05" value="1.3">
+        <small>q&lt;1 onda suave · q=1 cúspide · q&gt;1 bucles reales. En columnas controla la redondez de la cresta.</small></div>
+      <!-- solo bandas -->
+      <div class="ctl" data-mode="bands"><label><b>Solape entre pisos</b><output id="o_ov"></output></label>
+        <input type="range" id="ov" min="5" max="60" step="1" value="25"></div>
+      <div class="ctl" data-mode="bands waves"><label><b id="lblTw">Giro por banda</b><output id="o_tw"></output></label>
+        <input type="range" id="tw" min="-180" max="180" step="1" value="0"></div>
+      <!-- solo puntadas -->
+      <div class="ctl" data-mode="stitch"><label><b>Inclinación Z (tilt)</b><output id="o_zt"></output></label>
+        <input type="range" id="zt" min="0" max="3" step="0.1" value="0.6">
+        <small>Componente vertical de cada puntada (mm).</small></div>
+      <div class="sub" data-mode="stitch">Espiras por piso</div>
+      <div class="sub" data-mode="stitch">Apilado por pisos</div>
+      <div class="ctl" data-mode="stitch"><label><b>Capas por piso</b><output id="o_coils"></output></label>
+        <input type="range" id="coils" min="1" max="12" step="1" value="3">
+        <small>Cuántas capas idénticas se apilan antes de cambiar (como la cerámica: 3, 6, …).</small></div>
+      <div class="ctl" data-mode="stitch"><label><b>Rotación por piso</b><output id="o_floorRot"></output></label>
+        <input type="range" id="floorRot" min="-30" max="30" step="1" value="6">
+        <small>Grados que gira el patrón en cada cambio de piso. 0 = pisos alineados.</small></div>
+      <div class="ctl" data-mode="stitch"><label><b>Tipo de cambio</b><output id="o_floorSharp"></output></label>
+        <input type="range" id="floorSharp" min="0" max="1" step="0.1" value="1">
+        <small>1 = salto brusco (bloques marcados) · 0 = transición suave entre pisos.</small></div>
+      <div class="ctl" data-mode="stitch columns waves"><label><b>Fade inferior</b><output id="o_fi"></output></label>
+        <input type="range" id="fi" min="0" max="60" step="1" value="10"></div>
+      <div class="ctl" data-mode="stitch columns waves"><label><b>Fade superior</b><output id="o_fo"></output></label>
+        <input type="range" id="fo" min="0" max="60" step="1" value="0">
+        <small>mm en los que la textura crece/desaparece gradualmente.</small></div>
+      <div data-mode="surface">
+        <div class="sub">Segundo patrón (superpuesto)</div>
+        <div class="ctl"><label><b>Activar 2º patrón</b>
+          <input type="checkbox" id="pat2On" style="accent-color:var(--accent);width:16px;height:16px"></label>
+          <small>Suma un patrón de detalle sobre el principal (ej: puntos finos + ondas grandes).</small></div>
+        <div id="pat2Ctls" style="display:none">
+          <div class="ctl"><label><b>Patrón secundario</b></label>
+            <select id="pattern2sel"></select></div>
+          <div class="ctl"><label><b>Mezcla</b><output id="o_pat2Mix"></output></label>
+            <input type="range" id="pat2Mix" min="0.1" max="0.9" step="0.05" value="0.4">
+            <small>0 = solo principal · 1 = solo secundario.</small></div>
+          <div class="ctl"><label><b>Densidad 2º</b><output id="o_k2"></output></label>
+            <input type="range" id="k2" min="6" max="140" step="2" value="40"></div>
+          <div class="ctl"><label><b>Repetición 2º</b><output id="o_rep2"></output></label>
+            <input type="range" id="rep2" min="0.5" max="16" step="0.5" value="6"></div>
+        </div>
+        <div class="sub">Gradiente por altura</div>
+        <div class="ctl"><label><b>Activar gradiente</b>
+          <input type="checkbox" id="gradOn" style="accent-color:var(--accent);width:16px;height:16px"></label>
+          <small>La textura crece o decrece con la altura (base lisa, corona intrincada).</small></div>
+        <div id="gradCtls" style="display:none">
+          <div class="row2">
+            <div class="ctl"><label><b>Abajo</b><output id="o_gradBot"></output></label>
+              <input type="range" id="gradBot" min="0" max="1.5" step="0.05" value="0"></div>
+            <div class="ctl"><label><b>Arriba</b><output id="o_gradTop"></output></label>
+              <input type="range" id="gradTop" min="0" max="1.5" step="0.05" value="1"></div>
+          </div>
+          <div class="ctl"><label><b>Curva</b><output id="o_gradCurve"></output></label>
+            <input type="range" id="gradCurve" min="0.3" max="4" step="0.1" value="1.8">
+            <small>Multiplicador de amplitud: 0 abajo → sin textura. &lt;1 crece rápido · &gt;1 se retrasa hacia arriba.</small></div>
+        </div>
+      </div>
+    </details>
+<details>
+      <summary>04b · Máscara y zonas</summary>
+      <div class="ctl"><label><b>Activar máscara</b>
+        <input type="checkbox" id="maskOn" style="accent-color:var(--accent);width:16px;height:16px"></label>
+        <small>Combina zonas lisas y texturizadas. Aplica en Puntadas, Columnas, Olas y Superficie.</small></div>
+      <div id="maskCtls" style="display:none">
+        <div class="sub">Paneles verticales</div>
+        <div class="ctl"><label><b>Número de paneles</b><output id="o_maskSectors"></output></label>
+          <input type="range" id="maskSectors" min="0" max="12" step="1" value="0">
+          <small>0 = sin división angular. Ej: 6 = seis columnas alrededor.</small></div>
+        <div class="ctl"><label><b>Ancho con textura</b><output id="o_maskDuty"></output></label>
+          <input type="range" id="maskDuty" min="0.1" max="0.9" step="0.05" value="0.5">
+          <small>Fracción de cada panel que lleva textura (resto liso).</small></div>
+        <div class="sub">Bandas horizontales</div>
+        <div class="ctl"><label><b>Número de bandas</b><output id="o_maskBands"></output></label>
+          <input type="range" id="maskBands" min="0" max="16" step="1" value="0">
+          <small>0 = sin división en altura. Ej: 8 = ocho franjas apiladas.</small></div>
+        <div class="ctl"><label><b>Alto con textura</b><output id="o_maskDutyZ"></output></label>
+          <input type="range" id="maskDutyZ" min="0.1" max="0.9" step="0.05" value="0.5">
+          <small>Fracción de cada banda que lleva textura.</small></div>
+        <div class="sub">Transición</div>
+        <div class="ctl"><label><b>Suavidad de borde</b><output id="o_maskSoft"></output></label>
+          <input type="range" id="maskSoft" min="0.01" max="0.3" step="0.01" value="0.08">
+          <small>Bajo = corte nítido entre liso y textura · alto = degradado.</small></div>
+      </div>
+    </details>
+<details>
+      <summary>04c · Niveles por altura</summary>
+      <div class="ctl"><label><b>Activar niveles</b>
+        <input type="checkbox" id="levelsOn" style="accent-color:var(--accent);width:16px;height:16px"></label>
+        <small>Aplica un patrón de superficie distinto en cada rango de altura. Anula el modo único.</small></div>
+      <div id="levelsCtls" style="display:none">
+        <div id="levelsList"></div>
+        <div class="btns" style="margin-top:8px">
+          <button id="btnAddLevel" class="ghost" style="flex:1">+ Añadir nivel</button>
+        </div>
+        <div class="ctl" style="margin-top:10px"><label><b>Suavizar transición</b><output id="o_levelBlend"></output></label>
+          <input type="range" id="levelBlend" min="0" max="20" step="0.5" value="0">
+          <small>mm de mezcla gradual a cada lado de la frontera entre niveles. 0 = corte seco.</small></div>
+        <small style="color:var(--muted);font-size:11px;display:block;margin-top:6px">
+          Cada nivel llega hasta su altura (mm) usando su patrón. El último cubre hasta el tope.
+        </small>
+      </div>
+    </details>
+<details>
+      <summary>04d · Nervios (refuerzos)</summary>
+      <div class="ctl"><label><b>Activar nervios</b>
+        <input type="checkbox" id="ribsOn" style="accent-color:var(--accent);width:16px;height:16px"></label>
+        <small>Capa independiente de refuerzos sobre la pared. Ideal para pantallas de lámpara.</small></div>
+      <div id="ribsCtls" style="display:none">
+        <div class="sub">Anillos (nervios circulares)</div>
+        <div class="ctl"><label><b>Número de anillos</b><output id="o_ribRings"></output></label>
+          <input type="range" id="ribRings" min="0" max="20" step="1" value="5">
+          <small>Aros horizontales que suben como pisos. 0 = ninguno.</small></div>
+        <div class="ctl"><label><b>Grosor del anillo</b><output id="o_ribThick"></output></label>
+          <input type="range" id="ribThick" min="0.4" max="6" step="0.2" value="1.2">
+          <small>Alto de cada aro (mm).</small></div>
+        <div class="sub">Columnas (nervios verticales)</div>
+        <div class="ctl"><label><b>Número de columnas</b><output id="o_ribCols"></output></label>
+          <input type="range" id="ribCols" min="0" max="24" step="1" value="0">
+          <small>Costillas verticales alrededor. 0 = ninguna.</small></div>
+        <div class="ctl"><label><b>Ancho de columna</b><output id="o_ribWidth"></output></label>
+          <input type="range" id="ribWidth" min="4" max="40" step="1" value="12">
+          <small>Anchura angular de cada costilla (grados).</small></div>
+        <div class="ctl"><label><b>Giro de columnas</b><output id="o_ribTwist"></output></label>
+          <input type="range" id="ribTwist" min="-360" max="360" step="10" value="0">
+          <small>Espiral de las columnas a lo largo de la altura.</small></div>
+        <div class="sub">Común</div>
+        <div class="ctl"><label><b>Dirección</b></label>
+          <select id="ribDir">
+            <option value="out">Circunscrito (hacia afuera)</option>
+            <option value="in">Inscrito (hacia adentro)</option>
+            <option value="both">Ambos (dentro y fuera)</option>
+          </select>
+          <small>Los nervios pueden sobresalir de la pared, hundirse hacia dentro, o las dos.</small></div>
+        <div class="ctl"><label><b>Relieve del nervio</b><output id="o_ribSize"></output></label>
+          <input type="range" id="ribSize" min="0.5" max="10" step="0.5" value="2.5">
+          <small>Cuánto sobresale el nervio de la pared.</small></div>
+        <div class="ctl"><label><b>Separación de pared</b><output id="o_ribOut"></output></label>
+          <input type="range" id="ribOut" min="0" max="4" step="0.2" value="0">
+          <small>0 = pegado a la pared · &gt;0 = despegado (efecto jaula).</small></div>
+        <div class="ctl"><label><b>Margen sup/inf</b><output id="o_ribInset"></output></label>
+          <input type="range" id="ribInset" min="0" max="30" step="1" value="3">
+          <small>mm sin nervios arriba y abajo.</small></div>
+      </div>
+    </details>
+<details>
+      <summary>05 · Extrusión e impresión</summary>
+      <div class="ctl"><label><b>Diámetro de boquilla</b></label>
+        <select id="nozzle">
+          <option value="0.2">0.2 mm (detalle fino)</option>
+          <option value="0.4" selected>0.4 mm (estándar)</option>
+          <option value="0.6">0.6 mm</option>
+          <option value="0.8">0.8 mm</option>
+          <option value="1.0">1.0 mm (gruesa)</option>
+        </select>
+        <small>Ajusta automáticamente el ancho de línea y la altura de capa recomendados. Puedes afinarlos abajo.</small></div>
+      <div class="row2">
+        <div class="ctl"><label><b>Capa</b><output id="o_lh"></output></label>
+          <input type="range" id="lh" min="0.06" max="0.8" step="0.02" value="0.2"></div>
+        <div class="ctl"><label><b>Ancho</b><output id="o_ew"></output></label>
+          <input type="range" id="ew" min="0.2" max="1.4" step="0.05" value="0.45"></div>
+      </div>
+      <div class="ctl"><label><b>Flujo en patrón</b><output id="o_fl"></output></label>
+        <input type="range" id="fl" min="60" max="200" step="5" value="120"></div>
+      <div class="sub">Soldar arranque de espiral</div>
+      <div class="ctl"><label><b>Sobreextrusión inicial</b><output id="o_seamBoost"></output></label>
+        <input type="range" id="seamBoost" min="1" max="2.5" step="0.1" value="1.4">
+        <small>Flujo extra al arrancar la espiral, para soldar la costura con la base. 1 = desactivado.</small></div>
+      <div class="ctl"><label><b>Longitud de soldadura</b><output id="o_seamLen"></output></label>
+        <input type="range" id="seamLen" min="5" max="120" step="5" value="40">
+        <small>mm de recorrido durante los que decae la sobreextrusión.</small></div>
+      <div class="ctl"><label><b>Compensar voladizos</b>
+        <input type="checkbox" id="flowMod" style="accent-color:var(--accent);width:16px;height:16px"></label>
+        <small>Reduce flujo y velocidad en los tramos que vuelan, para que no se descuelguen.</small></div>
+      <div id="flowModCtls" style="display:none">
+        <div class="ctl"><label><b>Umbral de compensación</b><output id="o_fmA"></output></label>
+          <input type="range" id="fmA" min="30" max="70" step="1" value="45">
+          <small>Ángulo (desde vertical) a partir del cual empieza a bajar el flujo.</small></div>
+        <div class="ctl"><label><b>Flujo mínimo en voladizo</b><output id="o_fmMin"></output></label>
+          <input type="range" id="fmMin" min="50" max="100" step="5" value="75">
+          <small>% de flujo en el punto más volado (90° horizontal).</small></div>
+        <div class="ctl"><label><b>Freno de velocidad</b><output id="o_fmV"></output></label>
+          <input type="range" id="fmV" min="0" max="70" step="5" value="40">
+          <small>% de reducción de velocidad en el tramo más volado.</small></div>
+      </div>
+      <div class="row2">
+        <div class="ctl"><label><b>Vel. base</b><output id="o_vb"></output></label>
+          <input type="range" id="vb" min="10" max="80" step="5" value="35"></div>
+        <div class="ctl"><label><b>Vel. patrón</b><output id="o_vw"></output></label>
+          <input type="range" id="vw" min="4" max="60" step="1" value="12"></div>
+      </div>
+      <div class="row2">
+        <div class="ctl"><label><b>Nozzle °C</b></label><input type="number" id="temp" value="205"></div>
+        <div class="ctl"><label><b>Cama °C</b></label><input type="number" id="bed" value="60"></div>
+      </div>
+      <div class="ctl"><label><b>Ventilador en patrón</b><output id="o_fan"></output></label>
+        <input type="range" id="fan" min="0" max="100" step="5" value="100"></div>
+      <div class="row2">
+        <div class="ctl"><label><b>Filamento Ø</b></label><input type="number" id="fd" value="1.75" step="0.05"></div>
+        <div class="ctl"><label><b>Centro X / Y</b></label>
+          <div style="display:flex;gap:6px">
+            <input type="number" id="cx" value="150" step="1">
+            <input type="number" id="cy" value="150" step="1">
+          </div></div>
+      </div>
+    </details>
+<details>
+      <summary>08 · Perfil de impresora</summary>
+      <div class="ctl"><label><b>Modelo</b></label>
+        <select id="printerPreset">
+          <option value="custom">Personalizado…</option>
+          <option value="ender3">Creality Ender 3 / Pro / V2 (220×220×250)</option>
+          <option value="ender3s1">Creality Ender 3 S1 (220×220×270)</option>
+          <option value="ender5">Creality Ender 5 (220×220×300)</option>
+          <option value="cr10">Creality CR-10 (300×300×400)</option>
+          <option value="sidewinder">Artillery Sidewinder X1 / X2 (300×300×400)</option>
+          <option value="genius">Artillery Genius (220×220×250)</option>
+          <option value="prusamk3">Prusa i3 MK3/MK4 (250×210×210)</option>
+          <option value="prusamini">Prusa Mini (180×180×180)</option>
+          <option value="bambup1">Bambu Lab P1P / X1 (256×256×256)</option>
+          <option value="bambua1">Bambu Lab A1 (256×256×256)</option>
+          <option value="voron24">Voron 2.4 300 (300×300×350)</option>
+          <option value="kobra2">Anycubic Kobra 2 (250×220×220)</option>
+          <option value="mega">Anycubic Mega (210×210×205)</option>
+        </select>
+        <small>Elige tu impresora o usa Personalizado para medidas propias.</small></div>
+      <div class="sub">Volumen de impresión</div>
+      <div class="row2">
+        <div class="ctl"><label><b>Ancho X</b><output id="o_bedW"></output></label>
+          <input type="range" id="bedW" min="100" max="500" step="5" value="300"></div>
+        <div class="ctl"><label><b>Fondo Y</b><output id="o_bedD"></output></label>
+          <input type="range" id="bedD" min="100" max="500" step="5" value="300"></div>
+      </div>
+      <div class="ctl"><label><b>Alto Z</b><output id="o_bedH"></output></label>
+        <input type="range" id="bedH" min="100" max="600" step="10" value="400"></div>
+      <div class="ctl"><label><b>Centrar pieza automáticamente</b>
+        <input type="checkbox" id="centerAuto" checked style="accent-color:var(--accent);width:16px;height:16px"></label>
+        <small>Coloca la pieza en el centro de la cama. Desactívalo para posición manual (Centro X/Y arriba).</small></div>
+      <div id="fitWarn" style="display:none;background:var(--accent-soft);color:var(--accent);
+        border-radius:9px;padding:9px 12px;font-size:12px;font-weight:600;margin-top:8px"></div>
+    </details>
+<details>
+      <summary>06 · G-code inicio / fin</summary>
+      <div class="ctl"><label><b>Inicio</b></label>
+      <textarea id="startG">; RizoLab — secuencia de inicio
+M104 S{temp}
+M140 S{bed}
+M190 S{bed}
+M109 S{temp}
+G28 ; home
+G90 ; coords absolutas
+M83 ; extrusor relativo
+G92 E0
+G1 Z5 F3000
+G1 X10 Y20 F6000
+G1 Z0.3 F3000
+G1 X110 Y20 E20 F1200 ; línea de purga
+G92 E0
+G1 Z5 F3000</textarea></div>
+      <div class="ctl"><label><b>Fin</b></label>
+      <textarea id="endG">; RizoLab end
+G91
+G1 E-4 F2400 ; retracción
+G1 Z15 F3000
+G90
+G1 X10 Y290 F6000 ; presentar pieza
+M104 S0
+M140 S0
+M106 S0
+M84 ; apagar motores</textarea></div>
+    </details>
+<div class="btns">
+      <button id="btnGcode">⬇ Descargar G-code</button>
+      <button id="btnJson" class="ghost">Guardar perfil</button>
+    </div>
+    <div class="btns" style="margin-top:8px">
+      <button id="btnLoad" class="ghost" style="flex:1">Cargar perfil (.json)</button>
+      <input type="file" id="fileJson" accept=".json" hidden>
+    </div>
+  
+      
+    </aside>
+  </div>
+</div>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const TAU = Math.PI*2;
+
+/* ================= estado ================= */
+let mode = 'bands'; // 'bands' | 'stitch'
+const sliderIds = ['dia','alt','baseL','brim','brimSep','walls','flh','flw','sqn','nl','st','sf1','sf2','gtw','k','amp','q','coils','ov','tw','zt','fi','fo','lh','ew','fl','vb','vw','fan','psm','rep','fk','pointy','ovLim','fmA','fmMin','fmV','maskSectors','maskDuty','maskBands','maskDutyZ','maskSoft','floorL','floorHole','levelBlend','ribRings','ribThick','ribCols','ribWidth','ribTwist','ribSize','ribOut','ribInset','seamBoost','seamLen','bedW','bedD','bedH','floorRot','floorSharp'];
+const units = {dia:' mm',alt:' mm',baseL:'',brim:'',brimSep:' mm',walls:'',flh:' mm',flw:' mm',sqn:'',nl:'',st:'',sf1:'',sf2:'',gtw:'°',k:'',amp:' mm',q:'',coils:'',ov:' %',tw:'°',zt:' mm',fi:' mm',fo:' mm',lh:' mm',ew:' mm',fl:' %',vb:' mm/s',vw:' mm/s',fan:' %',psm:'',rep:'',fk:'',pointy:'',ovLim:'°',pat2Mix:'',k2:'',rep2:'',gradBot:'×',gradTop:'×',gradCurve:'',fmA:'°',fmMin:' %',fmV:' %',maskSectors:'',maskDuty:'',maskBands:'',maskDutyZ:'',maskSoft:'',floorL:'',floorHole:' mm',levelBlend:' mm',ribRings:'',ribThick:' mm',ribCols:'',ribWidth:'°',ribTwist:'°',ribSize:' mm',ribOut:' mm',ribInset:' mm',seamBoost:'×',seamLen:' mm',bedW:' mm',bedD:' mm',bedH:' mm',floorRot:'°',floorSharp:''};
+
+const DEFAULTS = {
+  /* pieza de bienvenida: cuenco de puntadas escamadas (modo Puntadas) */
+  mode:'stitch', section:'circle',
+  dia:60, alt:90, baseL:8, brim:6, brimSep:0, walls:2, flh:0.3, flw:0.8,
+  sqn:6, nl:6, st:0.2, sf1:1, sf2:1.7, gtw:0,
+  k:33, amp:3.5, q:0.7, coils:8, floorRot:6, floorSharp:1, ov:30, tw:0, zt:0, fi:10, fo:0,
+  lh:0.2, ew:0.45, fl:120, vb:30, vw:10, fan:100,
+  psm:2, rep:4, fk:6, pointy:1.6, ovLim:50, pat2Mix:0.4, k2:40, rep2:6, gradBot:0, gradTop:1, gradCurve:1.8, fmA:45, fmMin:75, fmV:40, maskSectors:0, maskDuty:0.5, maskBands:0, maskDutyZ:0.5, maskSoft:0.08, floorL:3, floorHole:0, levelBlend:0, ribRings:5, ribThick:1.2, ribCols:0, ribWidth:12, ribTwist:0, ribSize:2.5, ribOut:0, ribInset:3, seamBoost:1.4, seamLen:40, temp:205, bed:65, fd:1.75, cx:150, cy:150,
+  bedW:300, bedD:300, bedH:400, centerAuto:true,
+  /* silueta de cuenco: estrecho abajo, se abre hacia arriba con curva suave */
+  prof:[{z:0,r:0.62},{z:0.12,r:0.60},{z:0.28,r:0.66},{z:0.45,r:0.78},{z:0.62,r:0.90},{z:0.78,r:0.97},{z:1,r:1}]
+};
+const MODE_DEFAULTS = {
+  bands:  {k:24, amp:7,   q:1.2, vw:10, fl:120},
+  stitch: {k:60, amp:2,   q:0.8, vw:25, fl:110, coils:3},
+  columns:{k:12, amp:2.5, q:1,   vw:30, fl:100},
+  waves:  {k:8,  amp:1.5, q:0.5, vw:30, fl:100},
+  surface:{k:12, amp:3,   q:1,   vw:30, fl:105}
+};
+const MODE_LBL = {
+  bands:  {k:'Rizos por vuelta',    amp:'Amplitud vertical',      t:'bandas aéreas', tw:'Giro por banda'},
+  stitch: {k:'Puntadas por vuelta', amp:'Profundidad de puntada', t:'puntadas'},
+  columns:{k:'Columnas por vuelta', amp:'Profundidad de columna', t:'columnas'},
+  waves:  {k:'Olas por vuelta',     amp:'Altura de ola',          t:'olas', tw:'Giro por capa'},
+  surface:{k:'Densidad angular',    amp:'Relieve del patrón',     t:'superficie'}
+};
+
+/* ================= editor de perfil ================= */
+const PROF_PRESETS = {
+  cyl :[{z:0,r:1},{z:0.25,r:1},{z:0.5,r:1},{z:0.75,r:1},{z:1,r:1}],
+  vase:[{z:0,r:0.62},{z:0.22,r:0.95},{z:0.5,r:1},{z:0.78,r:0.7},{z:1,r:0.82}],
+  cone:[{z:0,r:1},{z:0.25,r:0.85},{z:0.5,r:0.7},{z:0.75,r:0.55},{z:1,r:0.4}],
+  hour:[{z:0,r:1},{z:0.25,r:0.72},{z:0.5,r:0.5},{z:0.75,r:0.72},{z:1,r:1}],
+};
+let profPts = JSON.parse(JSON.stringify(DEFAULTS.prof));
+const pc = $('profCanvas'), pctx = pc.getContext('2d');
+const PAD = 14;
+function profToXY(p){
+  const w=pc.width, h=pc.height;
+  return {x: PAD + p.r/1.3*(w-2*PAD), y: h-PAD - p.z*(h-2*PAD)};
+}
+function xyToProf(x,y){
+  const w=pc.width, h=pc.height;
+  return {r: Math.min(1.3, Math.max(0.12, (x-PAD)/(w-2*PAD)*1.3)),
+          z: Math.min(1, Math.max(0, (h-PAD-y)/(h-2*PAD)))};
+}
+// ---- evaluación del perfil: Catmull-Rom + suavizado por tabla ----
+function profRaw(z){
+  const P=profPts;
+  if(z<=P[0].z) return P[0].r;
+  if(z>=P[P.length-1].z) return P[P.length-1].r;
+  let i=0; while(P[i+1].z < z) i++;
+  const p0=P[Math.max(0,i-1)], p1=P[i], p2=P[i+1], p3=P[Math.min(P.length-1,i+2)];
+  const t=(z-p1.z)/Math.max(1e-6,(p2.z-p1.z)), t2=t*t, t3=t2*t;
+  return 0.5*((2*p1.r)+(-p0.r+p2.r)*t+(2*p0.r-5*p1.r+4*p2.r-p3.r)*t2+(-p0.r+3*p1.r-3*p2.r+p3.r)*t3);
+}
+const LUTN=241;
+let profLUT=null;
+function rebuildLUT(){
+  let cur=new Array(LUTN);
+  for(let i=0;i<LUTN;i++) cur[i]=profRaw(i/(LUTN-1));
+  const passes=Math.round(parseFloat($('psm').value)||0);
+  for(let k=0;k<passes;k++){
+    const nx=cur.slice();
+    for(let i=1;i<LUTN-1;i++) nx[i]=(cur[i-1]+2*cur[i]+cur[i+1])*0.25;
+    nx[0]=(cur[0]+cur[1])*0.5; nx[LUTN-1]=(cur[LUTN-1]+cur[LUTN-2])*0.5;
+    cur=nx;
+  }
+  profLUT=cur;
+}
+function profAt(z){
+  if(!profLUT) rebuildLUT();
+  const x=Math.min(1,Math.max(0,z))*(LUTN-1);
+  const i=Math.floor(x), f=x-i;
+  return i>=LUTN-1 ? profLUT[LUTN-1] : profLUT[i]*(1-f)+profLUT[i+1]*f;
+}
+function profChanged(){ rebuildLUT(); drawProf(); scheduleRegen(); }
+
+let drawMode=false, stroke=[];
+function drawProf(){
+  const w=pc.width, h=pc.height;
+  const cs=getComputedStyle(document.body);
+  const cGrid=cs.getPropertyValue('--hair').trim()||'#eef0f3';
+  const cBorder=cs.getPropertyValue('--line').trim()||'#e4e7ec';
+  const cAccent=cs.getPropertyValue('--accent').trim()||'#1c5d66';
+  const cCard=cs.getPropertyValue('--card').trim()||'#fff';
+  const cMuted=cs.getPropertyValue('--muted').trim()||'#8a93a2';
+  pctx.clearRect(0,0,w,h);
+  // rejilla fina
+  pctx.strokeStyle=cGrid; pctx.lineWidth=1;
+  for(let i=1;i<8;i++){
+    const y=PAD+(h-2*PAD)*i/8, x=PAD+(w-2*PAD)*i/8;
+    pctx.beginPath();pctx.moveTo(PAD,y);pctx.lineTo(w-PAD,y);pctx.stroke();
+    pctx.beginPath();pctx.moveTo(x,PAD);pctx.lineTo(x,h-PAD);pctx.stroke();
+  }
+  pctx.strokeStyle=cBorder; pctx.strokeRect(PAD,PAD,w-2*PAD,h-2*PAD);
+  const x1=PAD+1/1.3*(w-2*PAD);
+  pctx.setLineDash([3,4]); pctx.beginPath();
+  pctx.moveTo(x1,PAD); pctx.lineTo(x1,h-PAD); pctx.stroke(); pctx.setLineDash([]);
+  // trazo libre en curso
+  if(drawMode && stroke.length>1){
+    pctx.strokeStyle=cMuted; pctx.lineWidth=1.5; pctx.beginPath();
+    stroke.forEach((s,i)=>{const q=profToXY(s); i?pctx.lineTo(q.x,q.y):pctx.moveTo(q.x,q.y);});
+    pctx.stroke();
+  }
+  // curva evaluada (con suavizado)
+  pctx.strokeStyle=cAccent; pctx.lineWidth=2; pctx.beginPath();
+  for(let i=0;i<=120;i++){
+    const z=i/120, q=profToXY({z,r:profAt(z)});
+    i===0?pctx.moveTo(q.x,q.y):pctx.lineTo(q.x,q.y);
+  }
+  pctx.stroke();
+  // puntos de control
+  if(!drawMode) profPts.forEach(p=>{
+    const q=profToXY(p);
+    pctx.fillStyle=cAccent; pctx.beginPath();
+    pctx.arc(q.x,q.y,5,0,TAU); pctx.fill();
+    pctx.strokeStyle=cCard; pctx.lineWidth=2; pctx.stroke();
+  });
+  const n=$('profN'); if(n) n.textContent=profPts.length;
+}
+function canvasXY(e){
+  const r=pc.getBoundingClientRect();
+  return {x:(e.clientX-r.left)*pc.width/r.width, y:(e.clientY-r.top)*pc.height/r.height};
+}
+function nearestPt(x,y,tol){
+  let best=-1,bd=tol||14;
+  profPts.forEach((p,i)=>{const q=profToXY(p),d=Math.hypot(q.x-x,q.y-y); if(d<bd){bd=d;best=i;}});
+  return best;
+}
+function insertPt(z,r){
+  z=Math.min(0.985,Math.max(0.015,z));
+  let i=0; while(i<profPts.length && profPts[i].z<z) i++;
+  profPts.splice(i,0,{z,r});
+  profChanged();
+}
+function removePt(i){
+  if(profPts.length<=3) return;
+  profPts.splice(i,1);
+  profChanged();
+}
+// ---- interacción ----
+let dragIdx=-1;
+pc.addEventListener('pointerdown',e=>{
+  const {x,y}=canvasXY(e);
+  if(drawMode){ stroke=[xyToProf(x,y)]; pc.setPointerCapture(e.pointerId); return; }
+  if(e.button===2) return;
+  dragIdx=nearestPt(x,y);
+  if(dragIdx>=0) pc.setPointerCapture(e.pointerId);
+});
+pc.addEventListener('pointermove',e=>{
+  const {x,y}=canvasXY(e);
+  if(drawMode){
+    if(stroke.length){ stroke.push(xyToProf(x,y)); drawProf(); }
+    return;
+  }
+  if(dragIdx<0)return;
+  const np=xyToProf(x,y), p=profPts[dragIdx];
+  p.r=np.r;
+  if(dragIdx>0 && dragIdx<profPts.length-1){
+    const lo=profPts[dragIdx-1].z+0.02, hi=profPts[dragIdx+1].z-0.02;
+    p.z=Math.min(hi,Math.max(lo,np.z));
+  }else{
+    p.z = dragIdx===0?0:1;
+  }
+  profChanged();
+});
+pc.addEventListener('pointerup',()=>{
+  if(drawMode && stroke.length>4) strokeToProfile();
+  else stroke=[];
+  dragIdx=-1;
+});
+pc.addEventListener('dblclick',e=>{
+  if(drawMode) return;
+  const {x,y}=canvasXY(e);
+  if(nearestPt(x,y)>=0) return;      // doble clic sobre un punto: no duplicar
+  const np=xyToProf(x,y);
+  insertPt(np.z,np.r);
+});
+pc.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  if(drawMode) return;
+  const {x,y}=canvasXY(e);
+  const i=nearestPt(x,y);
+  if(i>0 && i<profPts.length-1) removePt(i);
+});
+// convierte un trazo libre en puntos de control
+function strokeToProfile(){
+  const s=stroke.slice().sort((a,b)=>a.z-b.z);
+  const N=9, out=[];
+  for(let i=0;i<N;i++){
+    const z=i/(N-1);
+    let acc=0,cnt=0;
+    s.forEach(q=>{ if(Math.abs(q.z-z)<0.5/N){acc+=q.r;cnt++;} });
+    if(!cnt){ // sin muestras cerca: usar el más próximo
+      let bd=9,br=1;
+      s.forEach(q=>{const d=Math.abs(q.z-z); if(d<bd){bd=d;br=q.r;}});
+      acc=br;cnt=1;
+    }
+    out.push({z,r:Math.max(0.12,acc/cnt)});
+  }
+  profPts=out; stroke=[];
+  setDraw(false);
+  profChanged();
+}
+function setDraw(on){
+  drawMode=on;
+  $('btnDraw').style.background=on?'var(--accent)':'';
+  $('btnDraw').style.color=on?'#fff':'';
+  $('btnDraw').style.borderColor=on?'var(--accent)':'';
+  $('profHint').innerHTML = on
+    ? 'Modo dibujo: traza la silueta de abajo hacia arriba y suelta.'
+    : 'Arrastra los puntos · doble clic añade · clic derecho elimina · <b id="profN">'+profPts.length+'</b> puntos.';
+  pc.style.cursor=on?'crosshair':'default';
+  drawProf();
+}
+$('btnDraw').addEventListener('click',()=>setDraw(!drawMode));
+$('btnAddPt').addEventListener('click',()=>{
+  // inserta en el hueco vertical más grande
+  let gi=0,gd=-1;
+  for(let i=0;i<profPts.length-1;i++){
+    const d=profPts[i+1].z-profPts[i].z;
+    if(d>gd){gd=d;gi=i;}
+  }
+  const z=(profPts[gi].z+profPts[gi+1].z)/2;
+  insertPt(z,profRaw(z));
+});
+$('btnDelPt').addEventListener('click',()=>{
+  if(profPts.length>3) removePt(Math.floor(profPts.length/2));
+});
+$('psm').addEventListener('input',()=>{rebuildLUT();drawProf();});
+document.querySelectorAll('[data-prof]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    if(drawMode) setDraw(false);
+    profPts=JSON.parse(JSON.stringify(PROF_PRESETS[b.dataset.prof]));
+    profChanged();
+  });
+});
+
+/* ================= sección transversal ρ(θ) ∈ (0,1] ================= */
+function makeRhoFrom(sec,pp){
+  let f;
+  if(sec==='circle') f=()=>1;
+  else if(sec==='square'){
+    const n=pp.sqn;
+    f=th=>Math.pow(Math.pow(Math.abs(Math.cos(th)),n)+Math.pow(Math.abs(Math.sin(th)),n),-1/n);
+  }
+  else if(sec==='poly'){
+    const N=pp.nl, a=Math.PI/N;
+    f=th=>{const m=((th%(2*a))+2*a)%(2*a); return Math.cos(a)/Math.cos(m-a);};
+  }
+  else if(sec==='star'){
+    const N=pp.nl, A=pp.st;
+    f=th=>1-A*(0.5-0.5*Math.cos(N*th));
+  }
+  else { // superformula
+    const m=pp.nl, n1=pp.sf1, n2=pp.sf2;
+    f=th=>Math.pow(Math.pow(Math.abs(Math.cos(m*th/4)),n2)+Math.pow(Math.abs(Math.sin(m*th/4)),n2),-1/n1);
+  }
+  // normalizar para que max ρ = 1
+  let mx=0;
+  for(let i=0;i<720;i++) mx=Math.max(mx,f(i/720*TAU));
+  const inv=1/Math.max(mx,1e-6);
+  return th=>Math.max(0.05, f(th)*inv);
+}
+function makeRho(p){
+  return makeRhoFrom($('section').value, p);
+}
+
+/* ================= parámetros ================= */
+function readParams(){
+  const p={};
+  sliderIds.forEach(id=>p[id]=parseFloat($(id).value));
+  if(!$('brimOn').checked) p.brim=0;
+  p.pattern=curPattern;
+  p.pattern2=curPattern2;
+  p.pat2On=$('pat2On').checked;
+  p.gradOn=$('gradOn').checked;
+  p.flowMod=$('flowMod').checked;
+  p.maskOn=$('maskOn').checked;
+  p.floorOn=$('floorOn').checked;
+  p.levelsOn=$('levelsOn').checked;
+  p.ribsOn=$('ribsOn').checked;
+  p.ribDir=$('ribDir').value;
+  p.temp=parseFloat($('temp').value)||205;
+  p.bed=parseFloat($('bed').value)||60;
+  p.fd=parseFloat($('fd').value)||1.75;
+  p.bedW=parseFloat($('bedW').value)||300;
+  p.bedD=parseFloat($('bedD').value)||300;
+  p.bedH=parseFloat($('bedH').value)||400;
+  p.centerAuto=$('centerAuto').checked;
+  if(p.centerAuto){
+    // centro automático = mitad de la cama; sincroniza los campos manuales
+    p.cx=p.bedW/2; p.cy=p.bedD/2;
+    if($('cx')) $('cx').value=p.cx;
+    if($('cy')) $('cy').value=p.cy;
+  }else{
+    p.cx=parseFloat($('cx').value)||150;
+    p.cy=parseFloat($('cy').value)||150;
+  }
+  return p;
+}
+function refreshOutputs(){
+  sliderIds.forEach(id=>{const o=$('o_'+id); if(o) o.textContent=$(id).value+(units[id]||'');});
+}
+
+/* ================= niveles por altura =================
+   Cada nivel guarda un snapshot completo de los controles de diseño.
+   Al seleccionar un nivel, el panel se carga con esos valores;
+   al mover un control, se guarda en el nivel activo.                    */
+// parámetros que pertenecen a cada nivel (los de diseño, no los de máquina)
+const LEVEL_KEYS=['k','amp','q','rep','fk','pointy','gtw','fi','fo',
+  'zt','coils','floorRot','floorSharp','tw','sqn','nl','st','sf1','sf2',
+  'maskOn','maskSectors','maskDuty','maskBands','maskDutyZ','maskSoft','pat2On','pat2Mix','k2','rep2','gradOn','gradBot','gradTop','gradCurve'];
+function snapshotLevel(){
+  const s={mode, pattern:curPattern, pattern2:curPattern2, section:$('section').value};
+  LEVEL_KEYS.forEach(k=>{
+    const el=$(k);
+    if(!el) return;
+    s[k]=el.type==='checkbox'?el.checked:parseFloat(el.value);
+  });
+  return s;
+}
+function loadLevel(s){
+  if(s.mode) { setModeSilent(s.mode); }
+  if(s.pattern){ curPattern=s.pattern;
+    const sel=$('patternSel'); if(sel) sel.value=s.pattern;
+  }
+  if(s.pattern2){ curPattern2=s.pattern2;
+    const sel=$('pattern2sel'); if(sel) sel.value=s.pattern2;
+  }
+  if(s.section){ $('section').value=s.section; }
+  LEVEL_KEYS.forEach(k=>{
+    if(!(k in s)) return;
+    const el=$(k); if(!el) return;
+    if(el.type==='checkbox') el.checked=s[k];
+    else el.value=s[k];
+    // sincronizar casilla numérica hermana si existe
+    const box=el.parentNode && el.parentNode.querySelector('.num');
+    if(box) box.value=el.value;
+  });
+  refreshOutputs();
+  // reflejar visibilidad de máscara, superposición y gradiente
+  if($('maskCtls')) $('maskCtls').style.display=$('maskOn').checked?'':'none';
+  if($('pat2Ctls')) $('pat2Ctls').style.display=$('pat2On').checked?'':'none';
+  if($('gradCtls')) $('gradCtls').style.display=$('gradOn').checked?'':'none';
+  refreshSectionVis();
+  refreshPatVis();
+}
+let levels=[
+  Object.assign({z:20}, {mode:'surface',pattern:'diamond',section:'circle',sqn:6,nl:6,st:0.2,sf1:1,sf2:1.7,k:12,amp:3,q:1,rep:4,fk:6,pointy:1.6,gtw:0,fi:0,fo:0,zt:0.6,coils:1,tw:0,maskOn:false,maskSectors:0,maskDuty:0.5,maskBands:0,maskDutyZ:0.5,maskSoft:0.08}),
+  Object.assign({z:40}, {mode:'surface',pattern:'scales', section:'circle',sqn:6,nl:6,st:0.2,sf1:1,sf2:1.7,k:10,amp:4,q:1,rep:4,fk:6,pointy:1.6,gtw:0,fi:0,fo:0,zt:0.6,coils:1,tw:0,maskOn:false,maskSectors:0,maskDuty:0.5,maskBands:0,maskDutyZ:0.5,maskSoft:0.08})
+];
+let activeLevel=0;
+
+function buildLevelsUI(){
+  const box=$('levelsList'); if(!box) return;
+  box.innerHTML='';
+  levels.forEach((lv,idx)=>{
+    const row=document.createElement('div');
+    const on=idx===activeLevel;
+    row.style.cssText='border:1px solid '+(on?'var(--accent)':'var(--line)')+
+      ';padding:8px;margin-bottom:6px;background:'+(on?'var(--accent)':'var(--card)')+
+      ';cursor:pointer;display:flex;align-items:center;gap:8px';
+    const MODE_SHORT={bands:'Bandas',stitch:'Puntadas',columns:'Columnas',waves:'Olas',surface:'Superf.'};
+    const md=lv.mode||'surface';
+    const nm = md==='surface' ? (PAT_NAME[lv.pattern]||lv.pattern) : MODE_SHORT[md];
+    row.innerHTML=
+      `<b style="font-family:var(--mono);font-size:11px;color:${on?'#fff':'var(--ink)'}">N${idx+1}</b>
+       <span style="flex:1;font-size:12px;color:${on?'#fff':'var(--muted)'}">
+         ≤ <input type="number" data-z="${idx}" value="${lv.z}" min="10" step="10"
+            style="width:56px;padding:2px 4px;font-size:11px" onclick="event.stopPropagation()"> mm
+         · <b style="color:${on?'#fff':'var(--accent)'}">${nm}</b></span>
+       <button data-del="${idx}" class="ghost" style="padding:2px 7px;font-size:11px"
+         onclick="event.stopPropagation()">✕</button>`;
+    row.addEventListener('click',()=>selectLevel(idx));
+    box.appendChild(row);
+  });
+  box.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>{
+    if(levels.length>1){
+      const i=+b.dataset.del;
+      levels.splice(i,1);
+      if(activeLevel>=levels.length) activeLevel=levels.length-1;
+      buildLevelsUI(); loadLevel(levels[activeLevel]); scheduleRegen();
+    }
+  }));
+  box.querySelectorAll('[data-z]').forEach(inp=>inp.addEventListener('input',()=>{
+    levels[+inp.dataset.z].z=Math.max(10,parseFloat(inp.value)||10);
+    scheduleRegen();
+  }));
+}
+function selectLevel(idx){
+  // guardar lo que había en el nivel actual antes de cambiar
+  Object.assign(levels[activeLevel], snapshotLevel());
+  activeLevel=idx;
+  loadLevel(levels[idx]);
+  buildLevelsUI();
+  scheduleRegen();
+}
+// captura los cambios del panel en el nivel activo (si niveles está activo)
+function captureToActiveLevel(){
+  if(!$('levelsOn').checked) return;
+  const z=levels[activeLevel].z;
+  Object.assign(levels[activeLevel], snapshotLevel(), {z});
+  buildLevelsUI();
+}
+// devuelve el nivel que corresponde a una altura z (mm)
+function levelAt(z){
+  const sorted=[...levels].sort((a,b)=>a.z-b.z);
+  for(const lv of sorted) if(z<=lv.z) return lv;
+  return sorted[sorted.length-1];
+}
+
+/* ================= iconos + rejilla de patrones ================= */
+const S='stroke="#1c5d66" stroke-width="1.4" fill="none"';
+const PAT_ICONS={
+  sine:`<svg viewBox="0 0 24 24"><path ${S} d="M2 12q3-7 6 0t6 0 6 0"/></svg>`,
+  diamond:`<svg viewBox="0 0 24 24"><path ${S} d="M12 3l5 9-5 9-5-9z"/></svg>`,
+  ripple:`<svg viewBox="0 0 24 24"><circle ${S} cx="12" cy="12" r="3"/><circle ${S} cx="12" cy="12" r="6.5"/><circle ${S} cx="12" cy="12" r="10"/></svg>`,
+  hwave:`<svg viewBox="0 0 24 24"><path ${S} d="M2 8q3-4 6 0t6 0 6 0M2 16q3-4 6 0t6 0 6 0"/></svg>`,
+  vwave:`<svg viewBox="0 0 24 24"><path ${S} d="M8 2q-4 3 0 6t0 6 0 6M16 2q-4 3 0 6t0 6 0 6"/></svg>`,
+  bumps:`<svg viewBox="0 0 24 24"><circle ${S} cx="7" cy="7" r="2.4"/><circle ${S} cx="17" cy="7" r="2.4"/><circle ${S} cx="7" cy="17" r="2.4"/><circle ${S} cx="17" cy="17" r="2.4"/></svg>`,
+  bubbles:`<svg viewBox="0 0 24 24"><circle ${S} cx="9" cy="9" r="4"/><circle ${S} cx="16" cy="15" r="3"/><circle ${S} cx="17" cy="7" r="2"/></svg>`,
+  pleats:`<svg viewBox="0 0 24 24"><path ${S} d="M4 20l4-16 4 16 4-16 4 16"/></svg>`,
+  voronoi:`<svg viewBox="0 0 24 24"><path ${S} d="M3 9l6-4 7 3-2 7-8 2-4-5zM16 8l5 2-3 6"/></svg>`,
+  hexagon:`<svg viewBox="0 0 24 24"><path ${S} d="M8 4h5l3 4-3 4H8L5 8zM13 12h5"/></svg>`,
+  triangle:`<svg viewBox="0 0 24 24"><path ${S} d="M12 4l6 10H6zM12 14l3 5H9z"/></svg>`,
+  guilloche:`<svg viewBox="0 0 24 24"><path ${S} d="M3 12q5-8 9 0t9 0M3 12q5 8 9 0t9 0"/></svg>`,
+  hammered:`<svg viewBox="0 0 24 24"><path ${S} d="M5 8c2-2 4 2 6 0M13 8c2-2 4 2 6 0M5 15c2-2 4 2 6 0M13 15c2-2 4 2 6 0"/></svg>`,
+  sunflower:`<svg viewBox="0 0 24 24"><circle ${S} cx="12" cy="12" r="2"/><path ${S} d="M12 5v-2M12 21v-2M5 12h-2M21 12h-2M7 7l-1.4-1.4M18.4 18.4L17 17M17 7l1.4-1.4M5.6 18.4L7 17"/></svg>`,
+  scales:`<svg viewBox="0 0 24 24"><path ${S} d="M4 9q4-6 8 0M12 9q4-6 8 0M8 16q4-6 8 0"/></svg>`
+};
+const PAT_NAME={sine:'Seno',diamond:'Rombo',ripple:'Onda',hwave:'H-Wave',vwave:'V-Wave',
+  bumps:'Relieve',bubbles:'Burbujas',pleats:'Pliegues',voronoi:'Voronoi',hexagon:'Hexágono',
+  triangle:'Triángulo',guilloche:'Guilloché',hammered:'Martillado',sunflower:'Girasol',scales:'Escamas'};
+let curPattern='diamond';
+let curPattern2='bumps';
+// familias para agrupar el menú (más navegable que 15 sueltos)
+const PAT_GROUPS=[
+  {label:'Ondas y curvas', ids:['sine','hwave','vwave','ripple','guilloche']},
+  {label:'Geométricos', ids:['diamond','hexagon','triangle']},
+  {label:'Relieve y textura', ids:['bumps','bubbles','hammered','scales']},
+  {label:'Orgánicos', ids:['pleats','voronoi','sunflower']}
+];
+function buildPatGrid(){
+  const sel=$('patternSel'); if(!sel) return;
+  sel.innerHTML=PAT_GROUPS.map(gr=>
+    `<optgroup label="${gr.label}">`+
+    gr.ids.map(id=>`<option value="${id}"${id===curPattern?' selected':''}>${PAT_NAME[id]}</option>`).join('')+
+    `</optgroup>`
+  ).join('');
+  sel.onchange=()=>{
+    curPattern=sel.value;
+    refreshPatVis();
+    captureToActiveLevel();
+    scheduleRegen();
+  };
+}
+function buildPatGrid2(){
+  const sel=$('pattern2sel'); if(!sel) return;
+  sel.innerHTML=FIELD_LIST.map(id=>`<option value="${id}"${id===curPattern2?' selected':''}>${PAT_NAME[id]}</option>`).join('');
+  sel.onchange=()=>{ curPattern2=sel.value; captureToActiveLevel(); scheduleRegen(); };
+}
+// muestra parámetros específicos del patrón activo (p.ej. "punta" solo en escamas)
+function refreshPatVis(){
+  // menú de patrón visible solo en modo superficie
+  const wrap=$('patSelWrap'); if(wrap) wrap.style.display=(mode==='surface')?'':'none';
+  document.querySelectorAll('[data-pat]').forEach(el=>{
+    el.style.display=(mode==='surface'&&el.dataset.pat===curPattern)?'':'none';
+  });
+}
+
+/* ================= motor de campo (16 patrones) =================
+   Cada patrón es un campo f(θ,z,p) ∈ [0,1] aprox., que desplaza el radio.
+   th en radianes, z01 en [0,1] (altura normalizada). k = frecuencia angular.
+   Todos son paredes sólidas: la textura se suma al radio base.               */
+const GOLDEN = Math.PI*(3-Math.sqrt(5));           // ángulo áureo (~137.5°)
+function hash2(a,b){                                // ruido determinista [0,1)
+  let s=Math.sin(a*127.1+b*311.7)*43758.5453;
+  return s-Math.floor(s);
+}
+function smoothNoise(x,y){
+  const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;
+  const u=xf*xf*(3-2*xf), v=yf*yf*(3-2*yf);
+  const a=hash2(xi,yi),b=hash2(xi+1,yi),c=hash2(xi,yi+1),d=hash2(xi+1,yi+1);
+  return a*(1-u)*(1-v)+b*u*(1-v)+c*(1-u)*v+d*u*v;
+}
+// cada función recibe (th, z01, p, aspect) y devuelve un desplazamiento normalizado
+const FIELDS = {
+  sine:      (th,z,p)=>0.5+0.5*Math.sin(p.k*th),
+  diamond:   (th,z,p)=>{ const a=Math.sin(p.k*th), b=Math.sin(p.fk*z*Math.PI*2*p.rep);
+                         return Math.abs(a*b); },
+  ripple:    (th,z,p)=>{ const d=Math.hypot(Math.sin(th)*2, (z-0.5)*4);
+                         return 0.5+0.5*Math.cos(d*p.k - z*p.rep*6); },
+  hwave:     (th,z,p)=>0.5+0.5*Math.sin(z*Math.PI*2*p.rep + Math.sin(th*p.k)*0.6),
+  vwave:     (th,z,p)=>0.5+0.5*Math.cos(p.k*th + Math.sin(z*Math.PI*2*p.rep)*0.9),
+  bumps:     (th,z,p)=>{ const gx=th/(Math.PI*2)*p.k, gy=z*p.rep*p.k*0.5;
+                         const fx=gx-Math.floor(gx)-0.5, fy=gy-Math.floor(gy)-0.5;
+                         return Math.max(0,1-(fx*fx+fy*fy)*6); },
+  bubbles:   (th,z,p)=>{ // metaballs en rejilla escalonada
+                         let s=0;
+                         for(let o=0;o<2;o++){
+                           const gx=th/(Math.PI*2)*p.k+o*0.5, gy=z*p.rep*p.k*0.5+o*0.5;
+                           const fx=gx-Math.floor(gx)-0.5, fy=gy-Math.floor(gy)-0.5;
+                           s+=0.6/(fx*fx+fy*fy+0.08);
+                         }
+                         return Math.min(1,s*0.12); },
+  pleats:    (th,z,p)=>{ const x=(p.k*th/(Math.PI*2))%1; return Math.abs(2*x-1); },
+  voronoi:   (th,z,p)=>{ // celdas Worley con envolvimiento angular
+                         const cols=Math.max(2,Math.round(p.k)), rows=Math.max(2,Math.round(p.rep*p.k*0.5));
+                         const gx=th/(Math.PI*2)*cols, gy=z*rows;
+                         let d1=9;
+                         for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++){
+                           const cx=Math.floor(gx)+ox, cy=Math.floor(gy)+oy;
+                           const wcx=((cx%cols)+cols)%cols;
+                           const sx=cx+hash2(wcx,cy), sy=cy+hash2(wcx+7,cy+3);
+                           const d=Math.hypot(gx-sx,gy-sy); if(d<d1)d1=d;
+                         }
+                         return Math.min(1,d1); },
+  hexagon:   (th,z,p)=>{ // teselado por 3 cosenos a 60°
+                         const x=th/(Math.PI*2)*p.k, y=z*p.rep*p.k*0.5;
+                         const a=Math.cos(TAU*(x));
+                         const b=Math.cos(TAU*(x*0.5+y*0.866));
+                         const c=Math.cos(TAU*(-x*0.5+y*0.866));
+                         return (a+b+c+3)/6; },
+  triangle:  (th,z,p)=>{ const x=th/(Math.PI*2)*p.k, y=z*p.rep*p.k*0.5;
+                         const a=Math.cos(TAU*x), b=Math.cos(TAU*(x*0.5+y*0.866)), c=Math.cos(TAU*(-x*0.5+y*0.866));
+                         return Math.abs(a+b+c)/3; },
+  guilloche: (th,z,p)=>{ const a=Math.sin(p.k*th + z*p.rep*8);
+                         const b=Math.sin(p.k*1.6*th - z*p.rep*5);
+                         return 0.5+0.25*(a+b); },
+  hammered:  (th,z,p)=>{ const x=th/(Math.PI*2)*p.k*1.3, y=z*p.rep*p.k*0.7;
+                         return smoothNoise(x,y)*0.7+smoothNoise(x*2,y*2)*0.3; },
+  sunflower: (th,z,p,aspect)=>{ // filotaxis: bump en cada semilla del ángulo áureo
+                         const N=Math.max(20,Math.round(p.k*p.rep*10));
+                         let best=0;
+                         const zA=z*N;
+                         const lo=Math.max(0,Math.floor(zA)-6), hi=Math.min(N,Math.floor(zA)+6);
+                         for(let n=lo;n<hi;n++){
+                           const ang=n*GOLDEN;
+                           let dth=((th-ang)%(Math.PI*2)); dth=Math.atan2(Math.sin(dth),Math.cos(dth));
+                           const dz=(z - n/N)*aspect;
+                           const d2=(dth*dth)+(dz*dz*6);
+                           const b=Math.exp(-d2*p.k*0.4);
+                           if(b>best)best=b;
+                         }
+                         return best; },
+  scales:    (th,z,p,aspect)=>{ // escamas / gotas (la imagen del jarrón)
+                         const cols=Math.max(3,Math.round(p.k));
+                         const rows=Math.max(2,Math.round(p.rep*cols/aspect));
+                         let yy=z*rows;
+                         const row=Math.floor(yy), fy=yy-row;
+                         const shift=(row%2)*0.5;                 // aparejo de escamas
+                         let xx=th/(Math.PI*2)*cols+shift;
+                         const fx=Math.abs((xx-Math.floor(xx))-0.5)*2;   // 0 centro, 1 borde
+                         // gota: vértice arriba/abajo mediante exponente
+                         const cell=(1-fx)*(1-Math.abs(2*fy-1));
+                         return Math.pow(Math.max(0,cell), p.pointy||1); }
+};
+const FIELD_LIST = ['sine','diamond','ripple','hwave','vwave','bumps','bubbles',
+  'pleats','voronoi','hexagon','triangle','guilloche','hammered','sunflower','scales'];
+
+/* ================= generación de trayectoria ================= */
+function buildPath(p){
+  const pts=[];
+  const rho=makeRho(p);
+  const H=p.alt, Rmax=p.dia/2;
+  const twistTot=p.gtw*Math.PI/180;
+  const radiusAt=(z,th)=>{
+    const z01=Math.min(Math.max(z/H,0),1);
+    const thT=th - twistTot*z01;           // twist global
+    return Math.max(1, Rmax*profAt(z01)*rho(thT));
+  };
+  const nB=180;
+  const wallGap=p.ew*0.9, brimGap=p.flw*0.9;
+  // ---- brim / falda: anillos concéntricos de fuera hacia dentro, 1ª capa aplastada ----
+  for(let b=p.brim;b>=1;b--){
+    for(let i=0;i<=nB;i++){
+      const th=TAU*i/nB;
+      const r=radiusAt(p.flh,th)+p.brimSep+b*brimGap;
+      pts.push({x:r*Math.cos(th),y:r*Math.sin(th),z:p.flh,type:0,w:p.flw,h:p.flh});
+    }
+  }
+  // ---- base: capas planas con paredes múltiples; capa 0 aplastada ----
+  const baseH = p.baseL>0 ? p.flh + (p.baseL-1)*p.lh : 0;
+  for(let l=0;l<p.baseL;l++){
+    const z = p.flh + l*p.lh;
+    const first = (l===0);
+    const w = first?p.flw:p.ew, h = first?p.flh:p.lh;
+    for(let wall=0;wall<p.walls;wall++){
+      // alternar sentido del offset por capa para soldar mejor las paredes
+      const off = wall*(first?brimGap:wallGap);
+      for(let i=0;i<=nB;i++){
+        const th=TAU*i/nB;
+        const r=Math.max(1,radiusAt(z,th)-off);
+        pts.push({x:r*Math.cos(th),y:r*Math.sin(th),z,type:0,w,h});
+      }
+    }
+    // ---- piso sólido: relleno en espiral que adopta la forma exterior ----
+    if(p.floorOn && l<p.floorL){
+      const w = first?p.flw:p.ew, h = first?p.flh:p.lh;
+      const gap=w*0.92;
+      const rInner=Math.max(0, p.floorHole/2);
+      const rhoFloor=makeRho(p);                       // sección del modelo
+      // radio exterior (borde de la pared) en cada ángulo, ya con la forma
+      const wallAt=(th)=>{
+        const z01=Math.min(Math.max(z/H,0),1);
+        return Math.max(1, Rmax*profAt(z01)*rhoFloor(th - twistTot*z01)) - (p.walls*wallGap);
+      };
+      // radio exterior mínimo (para contar vueltas) y máximo
+      let rWallMin=1e9;
+      for(let i=0;i<nB;i++) rWallMin=Math.min(rWallMin, wallAt(TAU*i/nB));
+      rWallMin=Math.max(rInner+gap, rWallMin);
+      const turns=Math.max(1,Math.floor((rWallMin-rInner)/gap));
+      const segPerTurn=180;
+      const dir=(l%2===0)?1:-1;
+      for(let s=0;s<=turns*segPerTurn;s++){
+        const f=s/(turns*segPerTurn);                  // 0 en el borde, 1 en el centro
+        const ang=dir*TAU*turns*f;
+        // el borde tiene la forma exterior; hacia el centro se relaja a círculo
+        const rEdge=wallAt(ang);
+        const shape=(1-f);                             // 1 en borde → 0 en centro
+        // radio de esta vuelta: mezcla forma exterior con círculo del radio equivalente
+        const rCirc=rWallMin-(rWallMin-rInner)*f;      // espiral circular de referencia
+        const rShaped=rEdge-(rEdge-rInner)*f;          // espiral siguiendo la forma
+        const rr=rShaped*shape + rCirc*(1-shape);
+        pts.push({x:rr*Math.cos(ang),y:rr*Math.sin(ang),z,type:0,w,h});
+      }
+    }
+  }
+  let info={nBands:0,layers:0};
+  const zStart = p.baseL>0 ? baseH+p.lh : Math.max(p.flh,p.lh);
+
+  // ===== máscara m(θ,z) ∈ [0,1]: multiplica la amplitud del patrón =====
+  // mp = objeto de parámetros de máscara (global o de un nivel)
+  function mask(th,z01,mp){
+    mp=mp||p;
+    if(!mp.maskOn) return 1;
+    const soft=Math.max(1e-3,mp.maskSoft);
+    let mA=1, mB=1;
+    if(mp.maskSectors>0){
+      let ph=((th/TAU*mp.maskSectors)%1+1)%1;
+      mA=smoothWin(ph,mp.maskDuty,soft);
+    }
+    if(mp.maskBands>0){
+      let pz=((z01*mp.maskBands)%1+1)%1;
+      mB=smoothWin(pz,mp.maskDutyZ,soft);
+    }
+    if(mp.maskSectors>0 && mp.maskBands>0) return mA*mB;
+    if(mp.maskSectors>0) return mA;
+    if(mp.maskBands>0) return mB;
+    return 1;
+  }
+  function smoothWin(x,duty,soft){
+    const d = x<duty ? Math.min(x, duty-x) : -Math.min(x-duty, 1-x);
+    return 0.5+0.5*Math.tanh(d/soft*3);
+  }
+
+  // ===== generadores de patrón por franja de altura [zLo,zHi) =====
+  // gp = parámetros efectivos (globales o de un nivel). Devuelve nada; empuja a pts.
+  const aspectG=H/(Rmax*2*Math.PI);
+  const rhoCacheG=new Map();
+  function rhoOfP(gp){
+    const key=(gp.section||'circle')+'|'+gp.sqn+'|'+gp.nl+'|'+gp.st+'|'+gp.sf1+'|'+gp.sf2;
+    if(!rhoCacheG.has(key)) rhoCacheG.set(key, makeRhoFrom(gp.section||$('section').value, gp));
+    return rhoCacheG.get(key);
+  }
+  // ondulación de borde orgánica: lóbulos irregulares CONTENIDOS, que ondulan sobre todo
+  // hacia adentro (pliegues apretados en un anillo estrecho, no pétalos que se disparan).
+  function radiusOfP(gp,z,th){
+    const z01=Math.min(Math.max(z/H,0),1);
+    const thT=th - twistTot*z01;
+    return Math.max(1, Rmax*profAt(z01)*rhoOfP(gp)(thT));
+  }
+
+
+  // ---- BANDAS aéreas dentro de [zLo,zHi) ----
+  function genBands(gp,zLo,zHi,biBase){
+    const A=gp.amp, step=Math.max(A*(1-gp.ov/100),0.5);
+    const nBands=Math.max(0,Math.floor((zHi-zLo-A)/step)+1);
+    const nSeg=Math.max(20,Math.round(900/gp.k));
+    const twist=(gp.tw||0)*Math.PI/180;
+    let count=0;
+    for(let b=0;b<nBands;b++){
+      const z0=zLo+b*step, phase=b*twist;
+      for(let w=0;w<gp.k;w++){
+        for(let i=(b===0&&w===0?0:1);i<=nSeg;i++){
+          const t=TAU*i/nSeg;
+          const u=(t-gp.q*Math.sin(t))/TAU;
+          const th=(TAU/gp.k)*(w+u)+phase;
+          const z=z0+(A/2)*(1-Math.cos(t));
+          const r=radiusOfP(gp,z,th);
+          pts.push({x:r*Math.cos(th),y:r*Math.sin(th),z,type:1,bi:biBase+b});
+        }
+      }
+    }
+    return nBands;
+  }
+  // ---- PUNTADAS dentro de [zLo,zHi) ----
+  function genStitch(gp,zLo,zHi,biBase){
+    const layers=Math.max(0,Math.floor((zHi-zLo)/p.lh));
+    const perFloor=Math.max(1,Math.round(gp.coils||1));    // capas idénticas por piso
+    const nSeg=Math.max(10,Math.round(720/gp.k));
+    const rotStep=(gp.floorRot||0)*Math.PI/180;            // rotación por piso (rad)
+    const sharp=(gp.floorSharp!=null?gp.floorSharp:1);     // 1=brusco, 0=suave
+    // fase de rotación de un piso dado (índice de piso f)
+    const floorPhase=f=>f*rotStep;
+    for(let l=0;l<layers;l++){
+      const f=Math.floor(l/perFloor);                      // piso actual
+      const posInFloor=(l%perFloor)/perFloor;              // 0..1 dentro del piso
+      // fase: constante dentro del piso (brusco) o interpolada hacia el siguiente (suave)
+      const phBase=floorPhase(f);
+      const phNext=floorPhase(f+1);
+      // con sharp=1 salta al inicio del piso; con sharp=0 transiciona suave a lo largo del piso
+      const ph=phBase+(phNext-phBase)*posInFloor*(1-sharp);
+      for(let w=0;w<gp.k;w++){
+        for(let i=(l===0&&w===0?0:1);i<=nSeg;i++){
+          const t=TAU*i/nSeg;
+          const u=(t-gp.q*Math.sin(t))/TAU;
+          const frac=(w+u)/gp.k;
+          const th=TAU*frac+ph;
+          let z=zLo+(l+frac)*p.lh;
+          let fade=1;
+          if(gp.fi>0) fade=Math.min(fade,(z-zLo)/gp.fi);
+          if(gp.fo>0) fade=Math.min(fade,(zHi-z)/gp.fo);
+          fade=Math.min(1,Math.max(0,fade));
+          const bump=(1-Math.cos(t))/2;
+          const mk=mask(th,Math.min(1,z/H),gp);
+          const r=radiusOfP(gp,z,th)+gp.amp*fade*bump*mk;
+          z+=gp.zt*fade*bump*mk;
+          pts.push({x:r*Math.cos(th),y:r*Math.sin(th),z,type:1,bi:biBase+f});
+        }
+      }
+    }
+    return Math.max(1,Math.ceil(layers/perFloor));
+  }
+  // ---- COLUMNAS / OLAS dentro de [zLo,zHi) ----
+  function genColWave(gp,zLo,zHi,biBase,isCol){
+    const layers=Math.max(0,Math.floor((zHi-zLo)/p.lh));
+    const nSeg=360;
+    const shp=0.5+gp.q*1.75;
+    const twistLayer=(gp.tw||0)*Math.PI/180;
+    for(let l=0;l<layers;l++){
+      for(let i=(l===0?0:1);i<=nSeg;i++){
+        const t=i/nSeg, th=TAU*t;
+        let z=zLo+(l+t)*p.lh;
+        let fade=1;
+        if(gp.fi>0) fade=Math.min(fade,(z-zLo)/gp.fi);
+        if(gp.fo>0) fade=Math.min(fade,(zHi-z)/gp.fo);
+        fade=Math.min(1,Math.max(0,fade));
+        let r=radiusOfP(gp,z,th);
+        const mk=mask(th,Math.min(1,z/H),gp);
+        if(isCol){
+          const thc=th - twistTot*Math.min(z/H,1);
+          const c=0.5+0.5*Math.cos(gp.k*thc);
+          r+=gp.amp*fade*Math.pow(c,shp)*mk;
+        }else{
+          z+=gp.amp*fade*(0.5-0.5*Math.cos(gp.k*th+(l+t)*twistLayer))*mk;
+        }
+        pts.push({x:r*Math.cos(th),y:r*Math.sin(th),z,type:1,bi:biBase+l});
+      }
+    }
+    return layers;
+  }
+  // ---- gradiente de intensidad por altura: devuelve factor 0..1 según z01 ----
+  // g0→g1 de abajo a arriba, con curva (exponente). curve<1 crece rápido, >1 lento.
+  function heightGrad(gp,z01){
+    if(!gp.gradOn) return 1;
+    const t=Math.pow(Math.min(1,Math.max(0,z01)), gp.gradCurve||1);
+    return (gp.gradBot||0)*(1-t) + (gp.gradTop!=null?gp.gradTop:1)*t;
+  }
+  // ---- evalúa el campo del patrón (principal + secundario superpuesto) ----
+  function evalField(gp,th,z01){
+    const f1=(FIELDS[gp.pattern]||FIELDS.sine)(th, z01, {...gp,k:gp.k||12}, aspectG);
+    if(!gp.pat2On) return f1;
+    const f2=(FIELDS[gp.pattern2]||FIELDS.bumps)(th, z01, {...gp,k:gp.k2||24,rep:gp.rep2||gp.rep}, aspectG);
+    const w=gp.pat2Mix!=null?gp.pat2Mix:0.4;      // peso del segundo patrón
+    return f1*(1-w)+f2*w;
+  }
+  // ---- SUPERFICIE (campo) dentro de [zLo,zHi) ----
+  function genSurface(gp,zLo,zHi,biBase){
+    const layers=Math.max(0,Math.floor((zHi-zLo)/p.lh));
+    const kEff=gp.k||12;
+    // resolución acorde al patrón más denso de los dos
+    const kMax=gp.pat2On? Math.max(kEff,gp.k2||24):kEff;
+    let nSeg=Math.max(120,Math.round(kMax*14));
+    // con calado, asegurar resolución suficiente para definir los bordes de agujero
+    const lvTwist=(gp.gtw||0)*Math.PI/180;
+    for(let l=0;l<layers;l++){
+      let firstInRow=true;
+      for(let i=(l===0?0:1);i<=nSeg;i++){
+        const t=i/nSeg, th=TAU*t;
+        const z=zLo+(l+t)*p.lh, z01=Math.min(1,Math.max(0,z/H));
+        let fade=1;
+        if(gp.fi>0) fade=Math.min(fade,(z-zLo)/gp.fi);
+        if(gp.fo>0) fade=Math.min(fade,(zHi-z)/gp.fo);
+        fade=Math.min(1,Math.max(0,fade));
+        const f=evalField(gp, th - lvTwist*z01, z01);
+        const amp=(gp.amp||0)*heightGrad(gp,z01);
+        const r=radiusOfP(gp,z,th)+amp*fade*f*mask(th,z01,gp);
+        pts.push({x:r*Math.cos(th),y:r*Math.sin(th),z,type:1,bi:biBase+l});
+      }
+    }
+    return layers;
+  }
+  // ---- desplazamiento radial (y dz) de un modo CONTINUO en un punto ----
+  // devuelve {dr, dz} para surface/columns/waves; usado para mezclar en fronteras
+  function dispContinuous(gp,md,th,z01,z){
+    const mk=mask(th,z01,gp);
+    if(md==='surface'){
+      const lvTwist=(gp.gtw||0)*Math.PI/180;
+      const f=evalField(gp, th - lvTwist*z01, z01);
+      return {dr:(gp.amp||0)*heightGrad(gp,z01)*f*mk, dz:0};
+    }
+    if(md==='columns'){
+      const shp=0.5+gp.q*1.75;
+      const thc=th - twistTot*z01;
+      const c=0.5+0.5*Math.cos(gp.k*thc);
+      return {dr:gp.amp*Math.pow(c,shp)*mk, dz:0};
+    }
+    // waves
+    const twistLayer=(gp.tw||0)*Math.PI/180;
+    return {dr:0, dz:gp.amp*(0.5-0.5*Math.cos(gp.k*th))*mk};
+  }
+  const CONT=new Set(['surface','columns','waves']);
+  // ---- genera un tramo continuo [zLo,zHi) mezclando con vecinos en las fronteras ----
+  // nbLo/nbHi: {gp,md} del nivel vecino inferior/superior (o null). blend en mm.
+  function genContinuousBlended(gp,md,zLo,zHi,biBase,nbLo,nbHi,blend){
+    const layers=Math.max(0,Math.floor((zHi-zLo)/p.lh));
+    const kEff=gp.k||12;
+    const nSeg = md==='surface' ? Math.max(120,Math.round(kEff*14)) : 360;
+    for(let l=0;l<layers;l++){
+      for(let i=(l===0?0:1);i<=nSeg;i++){
+        const t=i/nSeg, th=TAU*t;
+        const z=zLo+(l+t)*p.lh, z01=Math.min(1,Math.max(0,z/H));
+        // fades internos del propio nivel
+        let fade=1;
+        if(gp.fi>0) fade=Math.min(fade,(z-zLo)/gp.fi);
+        if(gp.fo>0) fade=Math.min(fade,(zHi-z)/gp.fo);
+        fade=Math.min(1,Math.max(0,fade));
+        let d=dispContinuous(gp,md,th,z01,z);
+        let dr=d.dr*fade, dz=d.dz*fade;
+        let rBase=radiusOfP(gp,z,th);
+        // mezcla con vecino inferior
+        if(nbLo && blend>0 && z < zLo+blend){
+          const w=0.5*(1-(z-zLo)/blend);            // 0.5 en la frontera → 0 a blend
+          const dn=dispContinuous(nbLo.gp,nbLo.md,th,z01,z);
+          dr=dr*(1-w)+dn.dr*w; dz=dz*(1-w)+dn.dz*w;
+          rBase=rBase*(1-w)+radiusOfP(nbLo.gp,z,th)*w;
+        }
+        // mezcla con vecino superior
+        if(nbHi && blend>0 && z > zHi-blend){
+          const w=0.5*(1-(zHi-z)/blend);
+          const dn=dispContinuous(nbHi.gp,nbHi.md,th,z01,z);
+          dr=dr*(1-w)+dn.dr*w; dz=dz*(1-w)+dn.dz*w;
+          rBase=rBase*(1-w)+radiusOfP(nbHi.gp,z,th)*w;
+        }
+        const r=rBase+dr;
+        pts.push({x:r*Math.cos(th),y:r*Math.sin(th),z:z+dz,type:1,bi:biBase+l});
+      }
+    }
+    return layers;
+  }
+
+  // despacho: genera el modo indicado en [zLo,zHi)
+  function genMode(md,gp,zLo,zHi,biBase){
+    if(md==='bands')   return genBands(gp,zLo,zHi,biBase);
+    if(md==='stitch')  return genStitch(gp,zLo,zHi,biBase);
+    if(md==='columns') return genColWave(gp,zLo,zHi,biBase,true);
+    if(md==='waves')   return genColWave(gp,zLo,zHi,biBase,false);
+    return genSurface(gp,zLo,zHi,biBase);
+  }
+
+  if(p.levelsOn){
+    // ===== niveles: cada franja se genera con el modo propio del nivel =====
+    const sortedLv=[...levels].sort((a,b)=>a.z-b.z);
+    const blend=p.levelBlend||0;
+    let zLo=zStart, biBase=0, totalUnits=0;
+    for(let idx=0;idx<sortedLv.length;idx++){
+      const lv=sortedLv[idx];
+      const zHi=(idx===sortedLv.length-1)? H : Math.min(H,lv.z);
+      if(zHi<=zLo) continue;
+      const gp={...p, ...lv};
+      const md=lv.mode||'surface';
+      let units;
+      if(blend>0 && CONT.has(md)){
+        // vecinos SOLO si también son continuos (no se puede fundir con bandas/puntadas)
+        const prev=sortedLv[idx-1], next=sortedLv[idx+1];
+        const nbLo=(prev && CONT.has(prev.mode||'surface'))
+          ? {gp:{...p,...prev}, md:prev.mode||'surface'} : null;
+        const nbHi=(next && CONT.has(next.mode||'surface'))
+          ? {gp:{...p,...next}, md:next.mode||'surface'} : null;
+        units=genContinuousBlended(gp,md,zLo,zHi,biBase,nbLo,nbHi,blend);
+      } else {
+        units=genMode(md,gp,zLo,zHi,biBase);   // corte seco (modos discretos)
+      }
+      biBase+=units; totalUnits+=units;
+      zLo=zHi;
+    }
+    info.layers=totalUnits; info.biMax=biBase;
+  } else if(mode==='bands'){
+    info.nBands=genBands(p,zStart,H,0); info.biMax=info.nBands;
+  } else if(mode==='stitch'){
+    const coils=Math.round(p.coils);
+    const floors=genStitch(p,zStart,H,0);
+    const layers=Math.max(0,Math.floor((H-zStart)/p.lh));
+    info.layers=layers; info.coils=coils; info.floors=floors; info.biMax=floors;
+  } else if(mode==='surface'){
+    info.layers=genSurface(p,zStart,H,0); info.biMax=info.layers;
+  } else {
+    info.layers=genColWave(p,zStart,H,0,mode==='columns'); info.biMax=info.layers;
+  }
+  {
+    // cierre del bloque de generación (mantener estructura)
+  }
+  // ===== NERVIOS: capa independiente de refuerzos sobre la pared =====
+  if(p.ribsOn){
+    // dir: +1 fuera (circunscrito), -1 dentro (inscrito). ribDir: 'out','in','both'
+    const ribR=(z,th,dir)=>{
+      const z01=Math.min(Math.max(z/H,0),1);
+      const thT=th - twistTot*z01;
+      return Math.max(1, Rmax*profAt(z01)*rho(thT)) + dir*p.ribOut;
+    };
+    const zBot=p.baseL>0 ? p.flh+(p.baseL-1)*p.lh+p.lh : Math.max(p.flh,p.lh);
+    // direcciones a generar según el modo elegido
+    const dirs = p.ribDir==='both' ? [1,-1] : (p.ribDir==='in' ? [-1] : [1]);
+    // --- nervios circulares (anillos que suben como pisos) ---
+    if(p.ribRings>0){
+      const nR=p.ribRings;
+      const zTop=H-p.ribInset;
+      const span=Math.max(0,zTop-zBot-p.ribInset);
+      const nSeg=Math.max(120,Math.round(Rmax*1.2));
+      for(const dir of dirs)
+      for(let k=0;k<nR;k++){
+        const zc=zBot+p.ribInset + (nR>1? span*k/(nR-1) : span/2);
+        const rings=Math.max(1,Math.round(p.ribThick/p.lh));
+        for(let rr=0;rr<rings;rr++){
+          const zz=zc - p.ribThick/2 + rr*p.lh;
+          for(let i=0;i<=nSeg;i++){
+            const th=TAU*i/nSeg;
+            const bulge=Math.sin(Math.PI*(rr+0.5)/rings);   // sección redondeada
+            const r=ribR(zz,th,dir)+dir*p.ribSize*bulge;
+            pts.push({x:r*Math.cos(th),y:r*Math.sin(th),z:zz,type:2,ribStart:i===0});
+          }
+        }
+      }
+    }
+    // --- nervios verticales / columnas ---
+    if(p.ribCols>0){
+      const nC=p.ribCols;
+      const zTop=H-p.ribInset;
+      const layers=Math.max(0,Math.floor((zTop-zBot-p.ribInset)/p.lh));
+      const twist=p.ribTwist*Math.PI/180;
+      const halfW=p.ribWidth*Math.PI/180;
+      const wSeg=Math.max(2,Math.round(p.ribWidth/3));
+      for(const dir of dirs)
+      for(let c=0;c<nC;c++){
+        const th0=TAU*c/nC;
+        for(let l=0;l<=layers;l++){
+          const zz=zBot+p.ribInset + l*p.lh;
+          const thc=th0 + twist*(zz/H);
+          for(let s=0;s<=wSeg;s++){
+            const th=thc - halfW + (2*halfW)*(l%2===0? s/wSeg : 1-s/wSeg);
+            const bulge=Math.sin(Math.PI*s/wSeg);
+            const r=ribR(zz,th,dir)+dir*p.ribSize*bulge;
+            pts.push({x:r*Math.cos(th),y:r*Math.sin(th),z:zz,type:2,ribStart:(l===0&&s===0)});
+          }
+        }
+      }
+    }
+  }
+  // ===== análisis de voladizos: ángulo respecto a la vertical por segmento =====
+  // marca cada punto del patrón con su pendiente local (grados desde la vertical)
+  let maxOver=0;
+  for(let i=1;i<pts.length;i++){
+    const a=pts[i-1], b=pts[i];
+    if(b.type!==1){ b.ov=0; continue; }
+    const dz=Math.abs(b.z-a.z);
+    const dxy=Math.hypot(b.x-a.x, b.y-a.y);
+    // ángulo desde vertical: 0° = sube recto, 90° = horizontal puro
+    const ang=Math.atan2(dxy,dz)*180/Math.PI;
+    b.ov=ang;
+    if(ang>maxOver) maxOver=ang;
+  }
+  info.maxOver=maxOver;
+  return {pts,info};
+}
+
+/* ================= estadísticas ================= */
+function computeStats(p,path){
+  let Lb=0,Lw=0,vol=0,tWave=0;
+  for(let i=1;i<path.pts.length;i++){
+    const a=path.pts[i-1],b=path.pts[i];
+    const d=Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z);
+    const w=b.w||p.ew, h=b.h||p.lh;
+    if(b.type===0){Lb+=d; vol+=d*w*h;}
+    else {
+      let flow=p.fl/100, vScale=1;
+      if(p.flowMod && (b.ov||0)>p.fmA){
+        const t=Math.min(1,(b.ov-p.fmA)/(90-p.fmA));
+        flow*=1-(1-p.fmMin/100)*t;
+        vScale=1-(p.fmV/100)*t;
+      }
+      Lw+=d; vol+=d*w*h*flow;
+      tWave += d/Math.max(1,p.vw*vScale);
+    }
+  }
+  const Af=Math.PI*(p.fd/2)**2;
+  return {Lb,Lw,fil:vol/Af/1000,g:vol*1.24/1000,min:(Lb/p.vb + tWave)/60};
+}
+
+/* ================= visor 3D ================= */
+const viewer=$('viewer');
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(45,1,1,4000);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+viewer.appendChild(renderer.domElement);
+const group=new THREE.Group(); scene.add(group);
+const bedMesh=new THREE.Mesh(new THREE.PlaneGeometry(300,300),
+  new THREE.MeshBasicMaterial({color:0xf4f5f7,side:THREE.DoubleSide}));
+bedMesh.rotation.x=-Math.PI/2; bedMesh.position.y=-0.6;
+let grid=new THREE.GridHelper(300,30,0xdfe3e8,0xeef0f3);
+let waveColor=0x1c5d66, baseColor=0x8a93a2;
+scene.add(bedMesh,grid);
+
+// ---- actualiza el volumen de impresión (cama del visor, cabecera y aviso de ajuste) ----
+let curBedW=300, curBedD=300;
+function updateMachine(){
+  const bw=parseFloat($('bedW').value)||300;
+  const bd=parseFloat($('bedD').value)||300;
+  const bh=parseFloat($('bedH').value)||400;
+  // recrear la malla de la cama con las nuevas dimensiones
+  if(bw!==curBedW || bd!==curBedD){
+    scene.remove(bedMesh); bedMesh.geometry.dispose();
+    bedMesh.geometry=new THREE.PlaneGeometry(bw,bd);
+    scene.add(bedMesh);
+    // recrear el grid al tamaño mayor de la cama
+    const c = theme==='dark'?GRID_DARK:GRID_LIGHT;
+    scene.remove(grid);
+    const gridSize=Math.max(bw,bd);
+    const divs=Math.max(6,Math.round(gridSize/10));
+    grid=new THREE.GridHelper(gridSize,divs,c.g1,c.g2);
+    scene.add(grid);
+    curBedW=bw; curBedD=bd;
+  }
+  // cabecera
+  const mh=$('machineLabel');
+  if(mh) mh.textContent=`Perfil de máquina · Volumen ${bw} × ${bd} × ${bh} mm`;
+  // aviso de ajuste: ¿cabe la pieza?
+  const dia=parseFloat($('dia').value)||60;
+  const alt=parseFloat($('alt').value)||90;
+  const margin=6; // margen de seguridad
+  const warn=$('fitWarn');
+  const problems=[];
+  if(dia > Math.min(bw,bd)-margin) problems.push(`el diámetro (${dia} mm) excede la cama (${Math.min(bw,bd)} mm)`);
+  if(alt > bh-margin) problems.push(`la altura (${alt} mm) excede el volumen Z (${bh} mm)`);
+  if(warn){
+    if(problems.length){
+      warn.style.display='';
+      warn.textContent='⚠ La pieza no cabe: '+problems.join(' y ')+'.';
+    }else{
+      warn.style.display='none';
+    }
+  }
+}
+
+
+
+let lineBase=null,lineWave=null,lineRibs=null,waveCount=0;
+// devuelve solo los puntos visibles según el aislamiento de pisos
+function visiblePts(path){
+  if(!path) return [];
+  if(!$('isoOn').checked) return path.pts;
+  const a=parseInt($('isoA').value), b=parseInt($('isoB').value);
+  const lo=Math.min(a,b), hi=Math.max(a,b);
+  return path.pts.filter(q=> q.type===1 && q.bi>=lo && q.bi<=hi);
+}
+function rebuildLines(path){
+  if(lineBase){group.remove(lineBase);lineBase.geometry.dispose();lineBase=null;}
+  if(lineWave){group.remove(lineWave);lineWave.geometry.dispose();lineWave=null;}
+  const mk=(arrPts,color)=>{
+    const g=new THREE.BufferGeometry();
+    const a=new Float32Array(arrPts.length*3);
+    arrPts.forEach((p,i)=>{a[3*i]=p.x;a[3*i+1]=p.z;a[3*i+2]=p.y;});
+    g.setAttribute('position',new THREE.BufferAttribute(a,3));
+    return new THREE.Line(g,new THREE.LineBasicMaterial({color}));
+  };
+  const vis=visiblePts(path);
+  const bp=vis.filter(p=>p.type===0), wp=vis.filter(p=>p.type===1);
+  if(bp.length>1){lineBase=mk(bp,baseColor);group.add(lineBase);}
+  if(wp.length>1){
+    if($('ovOn').checked){
+      // color por voladizo: verde → ámbar → rojo
+      const lim=parseFloat($('ovLim').value), crit=65;
+      const g=new THREE.BufferGeometry();
+      const pos=new Float32Array(wp.length*3), col=new Float32Array(wp.length*3);
+      wp.forEach((p,i)=>{
+        pos[3*i]=p.x;pos[3*i+1]=p.z;pos[3*i+2]=p.y;
+        const a=p.ov||0;
+        let r,gr,b;
+        if(a<lim){const t=a/lim; r=0.3+0.4*t; gr=0.75; b=0.3;}          // verde
+        else if(a<crit){const t=(a-lim)/(crit-lim); r=0.85; gr=0.55-0.25*t; b=0.1;} // ámbar
+        else {r=0.85;gr=0.15;b=0.1;}                                    // rojo
+        col[3*i]=r;col[3*i+1]=gr;col[3*i+2]=b;
+      });
+      g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+      g.setAttribute('color',new THREE.BufferAttribute(col,3));
+      lineWave=new THREE.Line(g,new THREE.LineBasicMaterial({vertexColors:true}));
+      group.add(lineWave);
+    }else{
+      lineWave=mk(wp,waveColor);group.add(lineWave);
+    }
+  }
+  waveCount=wp.length;
+  // ---- capa de nervios (type 2): segmentos que respetan cortes entre nervios ----
+  if(lineRibs){group.remove(lineRibs);lineRibs.geometry.dispose();lineRibs=null;}
+  const rp=vis.filter(p=>p.type===2);
+  if(rp.length>1){
+    const segs=[];
+    for(let i=1;i<rp.length;i++){
+      if(rp[i].ribStart) continue;               // no unir el fin de un nervio con el inicio del otro
+      const a=rp[i-1], b=rp[i];
+      segs.push(a.x,a.z,a.y, b.x,b.z,b.y);
+    }
+    const g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(segs),3));
+    lineRibs=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0x2a8a6a}));
+    group.add(lineRibs);
+  }
+  applySim();
+}
+function applySim(){
+  const f=parseInt($('sim').value)/1000;
+  $('simVal').textContent=Math.round(f*100)+'%';
+  if(lineWave) lineWave.geometry.setDrawRange(0,Math.max(2,Math.floor(waveCount*f)));
+  if(lineBase){
+    const n=lineBase.geometry.attributes.position.count;
+    lineBase.geometry.setDrawRange(0,Math.max(2,Math.floor(n*Math.min(1,f/0.12))));
+  }
+}
+$('sim').addEventListener('input',applySim);
+
+let rotY=0.7,rotX=0.42,dist=300,drag=false,pan=false,px=0,py=0,lastP=null,lastPath=null;
+const camTarget=new THREE.Vector3(0,45,0);
+function updateCam(){
+  camera.position.set(
+    camTarget.x+dist*Math.sin(rotY)*Math.cos(rotX),
+    camTarget.y+dist*Math.sin(rotX),
+    camTarget.z+dist*Math.cos(rotY)*Math.cos(rotX));
+  camera.lookAt(camTarget);
+}
+function resetCam(){
+  const h=lastP?lastP.alt:90;
+  camTarget.set(0,h/2,0);
+  dist=Math.max(140,h*2.4); rotY=0.7; rotX=0.42; updateCam();
+}
+// enfoca el centro de lo que está visible ahora mismo
+function focusVisible(){
+  const pts=visiblePts(lastPath);
+  if(!pts.length) return;
+  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9,z0=1e9,z1=-1e9;
+  pts.forEach(q=>{
+    x0=Math.min(x0,q.x);x1=Math.max(x1,q.x);
+    y0=Math.min(y0,q.z);y1=Math.max(y1,q.z);
+    z0=Math.min(z0,q.y);z1=Math.max(z1,q.y);
+  });
+  camTarget.set((x0+x1)/2,(y0+y1)/2,(z0+z1)/2);
+  const span=Math.max(x1-x0,y1-y0,z1-z0);
+  dist=Math.max(12,span*1.8);
+  updateCam();
+}
+viewer.addEventListener('pointerdown',e=>{
+  drag=true; pan=(e.button===1||e.button===2||e.shiftKey);
+  px=e.clientX;py=e.clientY;
+});
+viewer.addEventListener('contextmenu',e=>e.preventDefault());
+addEventListener('pointerup',()=>{drag=false;pan=false;});
+addEventListener('pointermove',e=>{
+  if(!drag)return;
+  const dx=e.clientX-px, dy=e.clientY-py;
+  if(pan){
+    // paneo en el plano de la cámara, proporcional al zoom
+    const s=dist*0.0016;
+    camTarget.x -= (dx*Math.cos(rotY) )*s;
+    camTarget.z += (dx*Math.sin(rotY) )*s;
+    camTarget.y += dy*s;
+  }else{
+    rotY+=dx*0.008;
+    rotX=Math.min(1.45,Math.max(-1.2,rotX+dy*0.006));
+  }
+  px=e.clientX;py=e.clientY;updateCam();
+});
+viewer.addEventListener('wheel',e=>{
+  e.preventDefault();
+  dist=Math.min(1500,Math.max(4,dist*(1+e.deltaY*0.0012)));
+  updateCam();
+},{passive:false});
+viewer.addEventListener('dblclick',focusVisible);
+function resize(){
+  const w=viewer.clientWidth,h=viewer.clientHeight;
+  renderer.setSize(w,h);renderer.setPixelRatio(devicePixelRatio);
+  camera.aspect=w/h;camera.updateProjectionMatrix();
+  const r=pc.getBoundingClientRect();
+  pc.width=Math.max(200,r.width*devicePixelRatio/1); pc.height=200;
+  drawProf();
+}
+addEventListener('resize',resize);
+(function loop(){requestAnimationFrame(loop);renderer.render(scene,camera);})();
+
+/* ================= modo & visibilidad ================= */
+function setModeSilent(m){
+  mode=m;
+  const ids={bands:'modeBands',stitch:'modeStitch',columns:'modeColumns',waves:'modeWaves',surface:'modeSurface'};
+  Object.entries(ids).forEach(([x,id])=>$(id).classList.toggle('on',x===m));
+  document.querySelectorAll('[data-mode]').forEach(el=>{
+    el.style.display=el.dataset.mode.split(' ').includes(m)?'':'none';
+  });
+  $('lblK').textContent=MODE_LBL[m].k;
+  $('lblAmp').textContent=MODE_LBL[m].amp;
+  if(MODE_LBL[m].tw) $('lblTw').textContent=MODE_LBL[m].tw;
+  $('patTitle').textContent='04 · Patrón · '+MODE_LBL[m].t;
+  const maskSec=document.getElementById('maskOn').closest('details');
+  if(maskSec) maskSec.style.display = m==='bands' ? 'none' : '';
+  refreshPatVis();
+}
+function setMode(m,applyDef){
+  setModeSilent(m);
+  if(applyDef) Object.entries(MODE_DEFAULTS[m]).forEach(([k,v])=>$(k).value=v);
+  captureToActiveLevel();
+  scheduleRegen();
+}
+$('modeBands').addEventListener('click',()=>setMode('bands',true));
+$('modeStitch').addEventListener('click',()=>setMode('stitch',true));
+$('modeColumns').addEventListener('click',()=>setMode('columns',true));
+$('modeWaves').addEventListener('click',()=>setMode('waves',true));
+$('modeSurface').addEventListener('click',()=>setMode('surface',true));
+
+function refreshSectionVis(){
+  const sec=$('section').value;
+  document.querySelectorAll('[data-sec]').forEach(el=>{
+    el.style.display=el.dataset.sec.split(' ').includes(sec)?'':'none';
+  });
+}
+$('section').addEventListener('change',()=>{refreshSectionVis();captureToActiveLevel();scheduleRegen();});
+$('ribDir').addEventListener('change',scheduleRegen);
+
+/* ================= regenerar ================= */
+let tmr=null;
+function scheduleRegen(){clearTimeout(tmr);tmr=setTimeout(regen,120);}
+function regen(){
+  refreshOutputs();
+  rebuildLUT();
+  lastP=readParams();
+  lastPath=buildPath(lastP);
+  rebuildLines(lastPath);
+  const s=computeStats(lastP,lastPath);
+  const extra= mode==='bands'
+    ? `pisos: <b>${lastPath.info.nBands}</b>`
+    : mode==='stitch'
+      ? `pisos: <b>${lastPath.info.floors}</b> × <b>${lastPath.info.coils}</b> espiras (${lastPath.info.layers} capas)`
+      : `capas: <b>${lastPath.info.layers}</b>`;
+  const ov=lastPath.info.maxOver||0;
+  const ovCol = ov>65?'#d94010':ov>parseFloat($('ovLim').value)?'#d9800d':'#4a8a3a';
+  const ovLine = `<br>voladizo máx: <b style="color:${ovCol}">${ov.toFixed(0)}°</b>`;
+  $('stats').innerHTML=
+    `${extra}<br>trayecto: <b>${((s.Lb+s.Lw)/1000).toFixed(1)} m</b><br>`+
+    `filamento: <b>${s.fil.toFixed(2)} m</b> · <b>${s.g.toFixed(0)} g</b><br>`+
+    `tiempo aprox: <b>${Math.floor(s.min/60)}h ${Math.round(s.min%60)}m</b>`+ovLine;
+  // aviso de cama (radio máx + puntada)
+  const rTot=lastP.dia/2+((mode==='stitch'||mode==='columns')?lastP.amp:0)+lastP.brimSep+lastP.brim*lastP.flw*0.9;
+  $('warn').style.display=(rTot>148)?'block':'none';
+  syncIso();
+  updateCam();
+}
+// ajusta el rango de los sliders de aislamiento al número real de pisos/capas
+function syncIso(){
+  const n=Math.max(0,(lastPath.info.biMax||1)-1);
+  [$('isoA'),$('isoB')].forEach(s=>{
+    s.max=n;
+    if(parseInt(s.value)>n) s.value=n;
+  });
+  $('o_isoA').textContent=$('isoA').value;
+  $('o_isoB').textContent=$('isoB').value;
+}
+document.querySelectorAll('input[type=range],input[type=number]').forEach(el=>{
+  // los inputs de nivel (data-z), máquina y perfil no se capturan al nivel
+  el.addEventListener('input',()=>{ captureToActiveLevel(); scheduleRegen(); });
+});
+
+/* ================= reset ================= */
+function applyDefaults(){
+  Object.entries(DEFAULTS).forEach(([k,v])=>{
+    if(k==='prof'||k==='mode'||k==='section')return;
+    if($(k)) $(k).value=v;
+  });
+  $('section').value=DEFAULTS.section;
+  $('brimOn').checked=true;
+  $('brimCtls').style.display='';
+  $('isoOn').checked=false;
+  $('isoCtls').style.display='none';
+  $('ovOn').checked=false;
+  document.querySelector('[data-ov]').style.display='none';
+  $('flowMod').checked=false;
+  $('flowModCtls').style.display='none';
+  $('maskOn').checked=false;
+  $('maskCtls').style.display='none';
+  $('floorOn').checked=false;
+  $('floorCtls').style.display='none';
+  $('levelsOn').checked=false;
+  $('levelsCtls').style.display='none';
+  $('ribsOn').checked=false;
+  $('ribsCtls').style.display='none';
+  $('ribDir').value='out';
+  curPattern='diamond'; curPattern2='bumps';
+  $('pat2On').checked=false; $('pat2Ctls').style.display='none';
+  $('gradOn').checked=false; $('gradCtls').style.display='none';
+  if($('pattern2sel')) $('pattern2sel').value='bumps';
+  if($('patternSel')) $('patternSel').value='diamond';
+  profPts=JSON.parse(JSON.stringify(DEFAULTS.prof));
+  if(typeof setDraw==='function') setDraw(false);
+  rebuildLUT();
+  setMode(DEFAULTS.mode,false);
+  refreshSectionVis();
+  drawProf();
+  regen();
+}
+$('btnReset').addEventListener('click',applyDefaults);
+$('isoOn').addEventListener('change',()=>{
+  $('isoCtls').style.display=$('isoOn').checked?'':'none';
+  regen();
+  if($('isoOn').checked) focusVisible(); else resetCam();
+});
+['isoA','isoB'].forEach(id=>$(id).addEventListener('input',()=>{regen();}));
+$('btnFocus').addEventListener('click',focusVisible);
+$('btnCamReset').addEventListener('click',resetCam);
+$('ovOn').addEventListener('change',()=>{
+  document.querySelector('[data-ov]').style.display=$('ovOn').checked?'':'none';
+  rebuildLines(lastPath); applySim();
+});
+$('ovLim').addEventListener('input',()=>{
+  $('ovLimTxt').textContent=$('ovLim').value;
+  if($('ovOn').checked){rebuildLines(lastPath);applySim();}
+});
+$('ribsOn').addEventListener('change',()=>{
+  $('ribsCtls').style.display=$('ribsOn').checked?'':'none';
+  scheduleRegen();
+});
+$('levelsOn').addEventListener('change',()=>{
+  const on=$('levelsOn').checked;
+  $('levelsCtls').style.display=on?'':'none';
+  if(on){
+    // el nivel activo hereda lo que hay ahora en el panel (modo, patrón, sección...)
+    Object.assign(levels[activeLevel], snapshotLevel());
+    buildLevelsUI();
+  }
+  scheduleRegen();
+});
+$('btnAddLevel').addEventListener('click',()=>{
+  const last=levels[levels.length-1];
+  // el nuevo nivel parte de una copia del último, 10 mm más arriba
+  const nv=Object.assign({}, last, {z:last.z+10, pattern:'hexagon'});
+  levels.push(nv);
+  activeLevel=levels.length-1;
+  buildLevelsUI();
+  loadLevel(nv);
+  scheduleRegen();
+});
+$('floorOn').addEventListener('change',()=>{
+  $('floorCtls').style.display=$('floorOn').checked?'':'none';
+  scheduleRegen();
+});
+$('pat2On').addEventListener('change',()=>{
+  $('pat2Ctls').style.display=$('pat2On').checked?'':'none';
+  captureToActiveLevel(); scheduleRegen();
+});
+$('gradOn').addEventListener('change',()=>{
+  $('gradCtls').style.display=$('gradOn').checked?'':'none';
+  captureToActiveLevel(); scheduleRegen();
+});
+$('maskOn').addEventListener('change',()=>{
+  $('maskCtls').style.display=$('maskOn').checked?'':'none';
+  scheduleRegen();
+});
+$('flowMod').addEventListener('change',()=>{
+  $('flowModCtls').style.display=$('flowMod').checked?'':'none';
+  scheduleRegen();
+});
+$('brimOn').addEventListener('change',()=>{
+  $('brimCtls').style.display=$('brimOn').checked?'':'none';
+  scheduleRegen();
+});
+
+/* ================= export ================= */
+function genGcode(){
+  const p=lastP,path=lastPath;
+  const Af=Math.PI*(p.fd/2)**2;
+  const L=[];
+  L.push('; === Generado con RizoLab ===');
+  L.push(`; modo ${mode} seccion ${$('section').value} dia ${p.dia} alt ${p.alt} k ${p.k} amp ${p.amp} q ${p.q}`);
+  L.push($('startG').value.replaceAll('{temp}',p.temp).replaceAll('{bed}',p.bed));
+  const f0=path.pts[0];
+  L.push(`G1 X${(f0.x+p.cx).toFixed(3)} Y${(f0.y+p.cy).toFixed(3)} F9000`);
+  L.push(`G1 Z${f0.z.toFixed(3)} F3000`);
+  L.push('M107 ; fan off en base');
+  let cur=-1, patLen=0;
+  for(let i=1;i<path.pts.length;i++){
+    const a=path.pts[i-1],b=path.pts[i];
+    if(b.type!==cur){
+      cur=b.type;
+      if(cur===1){
+        L.push(`M106 S${Math.round(p.fan*2.55)} ; fan patrón`);
+        L.push('; --- inicio del patrón ---');
+        patLen=0;
+      }
+      if(cur===2){
+        L.push(`M106 S${Math.round(p.fan*2.55)} ; fan nervios`);
+        L.push('; --- inicio de los nervios ---');
+      }
+    }
+    // salto entre nervios distintos: viaje sin extrusión
+    if(b.type===2 && b.ribStart){
+      L.push(`G0 X${(b.x+p.cx).toFixed(3)} Y${(b.y+p.cy).toFixed(3)} Z${b.z.toFixed(3)} F6000`);
+      continue;
+    }
+    const d=Math.hypot(b.x-a.x,b.y-a.y,b.z-a.z);
+    if(d<1e-4)continue;
+    const w=b.w||p.ew, h=b.h||p.lh;
+    let flow=b.type===1?p.fl/100:1;
+    let vScale=1;
+    // ---- sobreextrusión de arranque: suelda la costura inicial de la espiral ----
+    if(b.type===1 && p.seamBoost>1){
+      patLen+=d;
+      if(patLen < p.seamLen){
+        const t=patLen/p.seamLen;                    // 0 al inicio, 1 al final de la zona
+        flow *= p.seamBoost*(1-t) + 1*t;             // decae del boost a 1
+      }
+    }
+    // ---- compensación de voladizos (solo en el patrón) ----
+    if(p.flowMod && b.type===1 && (b.ov||0)>p.fmA){
+      const t=Math.min(1,(b.ov-p.fmA)/(90-p.fmA));   // 0 en umbral, 1 a 90°
+      flow *= 1-(1-p.fmMin/100)*t;                    // baja hacia el flujo mínimo
+      vScale = 1-(p.fmV/100)*t;                        // frena la velocidad
+    }
+    const e=d*w*h*flow/Af;
+    const firstLayer = b.type===0 && Math.abs(h-p.flh)<1e-6 && Math.abs(b.z-p.flh)<1e-6;
+    const baseF=(b.type===1?p.vw:(firstLayer?p.vb*0.6:p.vb));
+    const F=baseF*vScale*60;
+    L.push(`G1 X${(b.x+p.cx).toFixed(3)} Y${(b.y+p.cy).toFixed(3)} Z${b.z.toFixed(3)} E${e.toFixed(5)} F${Math.round(F)}`);
+  }
+  L.push($('endG').value);
+  return L.join('\n');
+}
+function download(name,content,type){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type}));
+  a.download=name;a.click();URL.revokeObjectURL(a.href);
+}
+$('btnGcode').addEventListener('click',()=>download('rizolab.gcode',genGcode(),'text/plain'));
+$('btnJson').addEventListener('click',()=>{
+  const data=readParams();
+  data.mode=mode; data.section=$('section').value; data.prof=profPts;
+  data.brimOn=$('brimOn').checked;
+  data.nozzle=$('nozzle').value;
+  data.printerPreset=$('printerPreset').value;
+  download('perfil_rizolab.json',JSON.stringify(data,null,2),'application/json');
+});
+$('btnLoad').addEventListener('click',()=>$('fileJson').click());
+$('fileJson').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  f.text().then(txt=>{
+    try{
+      const d=JSON.parse(txt);
+      Object.keys(d).forEach(k=>{
+        if(k==='prof'||k==='mode'||k==='section'||k==='brimOn')return;
+        const el=$(k); if(!el) return;
+        if(el.type==='checkbox') el.checked=d[k];
+        else el.value=d[k];
+      });
+      if(d.section) $('section').value=d.section;
+      if(d.prof) profPts=d.prof;
+      rebuildLUT();
+      if(typeof d.brimOn==='boolean'){
+        $('brimOn').checked=d.brimOn;
+        $('brimCtls').style.display=d.brimOn?'':'none';
+      }
+      // reflejar impresora cargada
+      if(d.bedW||d.bedD||d.bedH){ $('printerPreset').value='custom'; }
+      if('centerAuto' in d){ $('cx').disabled=$('cy').disabled=$('centerAuto').checked; }
+      setMode(d.mode||'bands',false);
+      refreshSectionVis(); drawProf(); updateMachine(); regen();
+    }catch(err){alert('Perfil inválido: '+err.message);}
+  });
+  e.target.value='';
+});
+
+/* ================= casillas numéricas junto a cada slider ================= */
+function attachNumberBoxes(){
+  document.querySelectorAll('.ctl input[type=range]').forEach(sl=>{
+    if(sl.dataset.numbox) return;              // ya envuelto
+    sl.dataset.numbox='1';
+    const box=document.createElement('input');
+    box.type='number';
+    box.className='num';
+    box.min=sl.min; box.max=sl.max; box.step=sl.step;
+    box.value=sl.value;
+    // envolver slider + casilla en una fila
+    const row=document.createElement('div');
+    row.className='rowline';
+    sl.parentNode.insertBefore(row,sl);
+    row.appendChild(sl);
+    row.appendChild(box);
+    // sincronización bidireccional
+    sl.addEventListener('input',()=>{ box.value=sl.value; });
+    box.addEventListener('input',()=>{
+      let v=parseFloat(box.value);
+      if(isNaN(v)) return;
+      v=Math.min(parseFloat(sl.max),Math.max(parseFloat(sl.min),v));
+      sl.value=v;
+      sl.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+    box.addEventListener('blur',()=>{ box.value=sl.value; });
+  });
+}
+
+/* ================= modo oscuro ================= */
+const GRID_LIGHT={bed:0xf4f5f7,g1:0xdfe3e8,g2:0xeef0f3,base:0x8a93a2,wave:0x1c5d66};
+const GRID_DARK ={bed:0x1d212a,g1:0x2b303a,g2:0x242932,base:0x828b9b,wave:0x4db3c0};
+let theme='light';
+function applyTheme(t){
+  theme=t;
+  document.body.classList.toggle('dark',t==='dark');
+  const c = t==='dark'?GRID_DARK:GRID_LIGHT;
+  bedMesh.material.color.setHex(c.bed);
+  grid.material.color.setHex(c.g1);
+  // el GridHelper usa dos colores; recrearlo es lo más simple
+  scene.remove(grid);
+  const gs=Math.max(curBedW,curBedD), dv=Math.max(6,Math.round(gs/10));
+  grid=new THREE.GridHelper(gs,dv,c.g1,c.g2);
+  scene.add(grid);
+  waveColor=c.wave; baseColor=c.base;
+  drawProf();
+  rebuildLines(lastPath);
+  applySim();
+}
+$('btnTheme').addEventListener('click',()=>applyTheme(theme==='dark'?'light':'dark'));
+
+/* ===== Tutorial de bienvenida + Donación ===== */
+const TOUR_STEPS=[
+  {kicker:'Bienvenido', title:'Qué es RizoLab',
+   html:`<div class="step-visual"><div class="step-ico">🌀</div><div><b>Diseña y genera G-code sin slicer</b><span>RizoLab crea trayectorias en espiral continua (modo jarrón) para tu impresora FDM. Diseñas la forma aquí y descargas el G-code listo para imprimir.</span></div></div>
+   <p>Es ideal para jarrones, lámparas, macetas y piezas decorativas de pared fina. Todo ocurre en tu navegador — nada se sube a ningún servidor.</p>`},
+  {kicker:'Paso 1', title:'Elige la silueta',
+   html:`<div class="step-visual"><div class="step-ico">📐</div><div><b>Sección 01 · Perfil</b><span>Define el contorno vertical de tu pieza.</span></div></div>
+   <ul><li>Usa un preset (Cilindro, Jarrón, Cono, Diábolo) como punto de partida.</li><li>Arrastra los puntos para afinar la silueta, o dibuja a mano alzada.</li><li>Ajusta diámetro y altura con los sliders.</li></ul>`},
+  {kicker:'Paso 2', title:'Aplica un patrón',
+   html:`<div class="step-visual"><div class="step-ico">✨</div><div><b>Barra de modos + Sección 04</b><span>Elige cómo se texturiza la superficie.</span></div></div>
+   <ul><li>Arriba eliges el modo: Bandas, Puntadas, Columnas, Olas o Superficie.</li><li>En Superficie, el menú desplegable ofrece patrones agrupados por familia.</li><li>Puedes superponer un segundo patrón y aplicar un gradiente por altura.</li></ul>`},
+  {kicker:'Paso 3', title:'Refina los detalles',
+   html:`<div class="step-visual"><div class="step-ico">🎛️</div><div><b>Secciones 02 a 07</b><span>Control fino de la impresión.</span></div></div>
+   <ul><li>Adherencia: falda, base sólida y primera capa.</li><li>Niveles por altura: distintos patrones a distintas alturas.</li><li>Nervios de refuerzo, máscara por zonas e inspección de voladizos.</li></ul>`},
+  {kicker:'Paso 4', title:'Exporta e imprime',
+   html:`<div class="step-visual"><div class="step-ico">⬇️</div><div><b>Sección 06 · Descargar G-code</b><span>Listo para tu impresora.</span></div></div>
+   <ul><li>Revisa las estadísticas (capas, filamento, tiempo estimado).</li><li>Usa el simulador inferior para ver cómo se construye capa a capa.</li><li>Descarga el G-code o guarda tu perfil en JSON para seguir después.</li></ul>
+   <p style="margin-top:6px;color:var(--muted);font-size:12.5px">Consejo: imprime en vase mode con pared fina, velocidad baja y buena ventilación.</p>`}
+];
+let tourIdx=0;
+function renderTour(){
+  const s=TOUR_STEPS[tourIdx];
+  $('tourKicker').textContent=s.kicker;
+  $('tourTitle').textContent=s.title;
+  $('tourBody').innerHTML=s.html;
+  $('tourDots').innerHTML=TOUR_STEPS.map((_,i)=>`<span class="${i===tourIdx?'on':''}"></span>`).join('');
+  $('tourPrev').style.visibility=tourIdx===0?'hidden':'visible';
+  $('tourNext').textContent=tourIdx===TOUR_STEPS.length-1?'Empezar':'Siguiente';
+}
+function openTour(){ tourIdx=0; renderTour(); $('tourOverlay').classList.add('show'); }
+function closeTour(){
+  $('tourOverlay').classList.remove('show');
+  try{ localStorage.setItem('rizolab_tour_seen','1'); }catch(e){}
+}
+$('btnHelp').addEventListener('click',openTour);
+$('tourClose').addEventListener('click',closeTour);
+$('tourSkip').addEventListener('click',closeTour);
+$('tourPrev').addEventListener('click',()=>{ if(tourIdx>0){tourIdx--;renderTour();} });
+$('tourNext').addEventListener('click',()=>{
+  if(tourIdx<TOUR_STEPS.length-1){ tourIdx++; renderTour(); }
+  else closeTour();
+});
+$('tourOverlay').addEventListener('click',e=>{ if(e.target===$('tourOverlay')) closeTour(); });
+
+// Donación — EDITA esta URL con tu enlace real (PayPal, Ko-fi, Buy Me a Coffee, etc.)
+const DONATE_URL='https://ko-fi.com/darwinenriquez';
+$('donateLink').href=DONATE_URL;
+$('btnDonate').addEventListener('click',()=>$('donateOverlay').classList.add('show'));
+$('donateClose').addEventListener('click',()=>$('donateOverlay').classList.remove('show'));
+$('donateOverlay').addEventListener('click',e=>{ if(e.target===$('donateOverlay')) $('donateOverlay').classList.remove('show'); });
+
+// abrir el tutorial automáticamente la primera vez
+try{ if(!localStorage.getItem('rizolab_tour_seen')) setTimeout(openTour,400); }catch(e){}
+
+/* ===== Perfil de impresora: presets y actualización ===== */
+// selector de boquilla: ajusta ancho de línea y altura de capa recomendados
+$('nozzle').addEventListener('change',()=>{
+  const nz=parseFloat($('nozzle').value)||0.4;
+  const ew=Math.round(nz*1.15*100)/100;             // ancho ≈ 1.15× boquilla
+  const lh=Math.round(nz*0.5*100)/100;              // altura de capa ≈ 0.5× boquilla (seguro)
+  setNum('ew', ew);
+  setNum('lh', Math.max(0.06, Math.min(0.8, lh)));
+  refreshOutputs(); scheduleRegen();
+});
+const PRINTER_PRESETS={
+  ender3:{w:220,d:220,h:250}, ender3s1:{w:220,d:220,h:270}, ender5:{w:220,d:220,h:300},
+  cr10:{w:300,d:300,h:400}, sidewinder:{w:300,d:300,h:400}, genius:{w:220,d:220,h:250},
+  prusamk3:{w:250,d:210,h:210}, prusamini:{w:180,d:180,h:180},
+  bambup1:{w:256,d:256,h:256}, bambua1:{w:256,d:256,h:256},
+  voron24:{w:300,d:300,h:350}, kobra2:{w:250,d:220,h:220}, mega:{w:210,d:210,h:205}
+};
+function setNum(id,val){ const el=$(id); if(el){ el.value=val; const box=el.parentNode&&el.parentNode.querySelector('.num'); if(box) box.value=val; } }
+$('printerPreset').addEventListener('change',()=>{
+  const pr=PRINTER_PRESETS[$('printerPreset').value];
+  if(pr){
+    setNum('bedW',pr.w); setNum('bedD',pr.d); setNum('bedH',pr.h);
+    refreshOutputs(); updateMachine(); scheduleRegen();
+  }
+});
+['bedW','bedD','bedH'].forEach(id=>{
+  $(id).addEventListener('input',()=>{
+    // al mover manualmente, el preset pasa a "Personalizado"
+    $('printerPreset').value='custom';
+    updateMachine();
+  });
+  $(id).addEventListener('change',()=>{ updateMachine(); scheduleRegen(); });
+});
+$('centerAuto').addEventListener('change',()=>{
+  const on=$('centerAuto').checked;
+  // deshabilitar campos manuales de centro cuando es automático
+  $('cx').disabled=on; $('cy').disabled=on;
+  scheduleRegen();
+});
+// la altura y el diámetro también afectan el aviso de ajuste
+['dia','alt'].forEach(id=>{ const el=$(id); if(el) el.addEventListener('input',updateMachine); });
+
+/* init: arranca en el "hola mundo" imprimible */
+attachNumberBoxes();
+resize();
+refreshSectionVis();
+buildPatGrid();
+buildPatGrid2();
+buildLevelsUI();
+setMode(DEFAULTS.mode,false);
+applyDefaults();
+refreshPatVis();
+updateMachine();
+$('cx').disabled=$('centerAuto').checked; $('cy').disabled=$('centerAuto').checked;
+resetCam();
+</script>
+</body>
+</html>
